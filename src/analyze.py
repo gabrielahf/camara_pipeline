@@ -10,9 +10,10 @@ import matplotlib.pyplot as plt
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PROCESSED = ROOT / "data" / "processed"
 
+
 def load_dataset():
-    parquet = DATA_PROCESSED / "dataset_mestre.parquet"
-    csv = DATA_PROCESSED / "dataset_mestre.csv"
+    parquet = DATA_PROCESSED / "dataset_mestre_clean.parquet"
+    csv = DATA_PROCESSED / "dataset_mestre_clean.csv"
 
     if parquet.exists():
         df = pd.read_parquet(parquet)
@@ -22,6 +23,7 @@ def load_dataset():
         raise FileNotFoundError("Nenhum dataset encontrado em data/processed/")
 
     return df
+
 
 def main():
     df = load_dataset()
@@ -34,14 +36,13 @@ def main():
     # cria atividade_composta se necessário
     if "atividade_composta" not in df.columns:
         df["atividade_composta"] = (
-            df.get("total_proposicoes", 0)
-            + df.get("total_eventos", 0) * 0.3
+            df.get("total_proposicoes", 0) + df.get("total_eventos", 0) * 0.3
         )
 
     x = df["gasto_total"].astype(float)
     y = df["atividade_composta"].astype(float)
 
-    r = float(np.corrcoef(x, y)[0,1]) if len(df) >= 2 else float("nan")
+    r = float(np.corrcoef(x, y)[0, 1]) if len(df) >= 2 else float("nan")
 
     # Scatter gasto vs atividade
     plt.figure()
@@ -73,17 +74,27 @@ def main():
     best_model = models[best_k - 2]
     df["cluster"] = best_model.labels_
 
-    resumo = df.groupby("cluster").agg(
-        n=("idDeputado", "count"),
-        gasto_medio=("gasto_total", "mean"),
-        atividade_media=("atividade_composta", "mean")
-    ).reset_index().to_dict(orient="records")
+    resumo = (
+        df.groupby("cluster")
+        .agg(
+            n=("idDeputado", "count"),
+            gasto_medio=("gasto_total", "mean"),
+            atividade_media=("atividade_composta", "mean"),
+        )
+        .reset_index()
+        .to_dict(orient="records")
+    )
 
     # Scatter clusters
     plt.figure()
     for c in sorted(df["cluster"].unique()):
         m = df["cluster"] == c
-        plt.scatter(df.loc[m, "gasto_total"], df.loc[m, "atividade_composta"], alpha=0.6, label=f"Cluster {c}")
+        plt.scatter(
+            df.loc[m, "gasto_total"],
+            df.loc[m, "atividade_composta"],
+            alpha=0.6,
+            label=f"Cluster {c}",
+        )
     plt.legend()
     plt.xlabel("Gasto total (R$)")
     plt.ylabel("Atividade composta")
@@ -96,12 +107,14 @@ def main():
         json.dumps({"pearson_r": r}, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     (DATA_PROCESSED / "kmeans_resumo.json").write_text(
-        json.dumps({"best_k": best_k, "resumo": resumo}, ensure_ascii=False, indent=2), encoding="utf-8"
+        json.dumps({"best_k": best_k, "resumo": resumo}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
 
     print("Correlação (r) =", r)
     print("Melhor k =", best_k)
     print("Arquivos salvos em", DATA_PROCESSED)
+
 
 if __name__ == "__main__":
     main()

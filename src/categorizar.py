@@ -3,14 +3,21 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 # Caminhos
-RAW = Path("data/raw/despesas.parquet")
-PROC = Path("data/processed/despesas_categorizadas.csv")
-PLOT = Path("data/processed/gastos_por_categoria.png")
+ROOT = Path(__file__).resolve().parents[1]
+
+RAW = ROOT / "data" / "raw" / "despesas.parquet"
+PROC = ROOT / "data" / "processed" / "despesas_categorizadas.csv"
+PLOT = ROOT / "data" / "processed" / "gastos_por_categoria.png"
+
+# RAW = Path("data/raw/despesas.parquet")
+# PROC = Path("data/processed/despesas_categorizadas.csv")
+# PLOT = Path("data/processed/gastos_por_categoria.png")
 
 
 # ---------------------------
 # 1) Função de categorização
 # ---------------------------
+
 
 def categorizar_despesas():
     print("Carregando despesas...")
@@ -20,19 +27,38 @@ def categorizar_despesas():
 
     grupos = {
         "Transporte": [
-            "bilhete", "passagem", "locomoção", "transporte", "aluguel de veículos",
-            "combustível", "taxi", "uber", "veículo", "fretamento"
+            "bilhete",
+            "passagem",
+            "locomoção",
+            "transporte",
+            "aluguel de veículos",
+            "combustível",
+            "taxi",
+            "uber",
+            "veículo",
+            "fretamento",
         ],
         "Alimentação": ["alimentação", "restaurante", "refeição", "lanches"],
         "Escritório e Funcionamento": [
-            "escritório", "materiais", "serviços postais", "correios",
-            "telefone", "internet", "locação", "espaço", "condomínio",
-            "copiadora", "material de expediente"
+            "escritório",
+            "materiais",
+            "serviços postais",
+            "correios",
+            "telefone",
+            "internet",
+            "locação",
+            "espaço",
+            "condomínio",
+            "copiadora",
+            "material de expediente",
         ],
         "Cursos e Capacitação": ["curso", "capacitação", "treinamento", "inscrição"],
         "Divulgação do Mandato": [
-            "publicidade", "divulgação", "assessoria de imprensa", "marketing"
-        ]
+            "publicidade",
+            "divulgação",
+            "assessoria de imprensa",
+            "marketing",
+        ],
     }
 
     def classificar(desc):
@@ -52,15 +78,14 @@ def categorizar_despesas():
 # 2) Função para gerar gráfico
 # ---------------------------
 
+
 def plot_gastos_por_categoria():
     print("Gerando gráfico de gastos por categoria...")
 
     df = pd.read_csv(PROC)
 
     agrupado = (
-        df.groupby("macroCategoria")["valorLiquido"]
-        .sum()
-        .sort_values(ascending=False)
+        df.groupby("macroCategoria")["valorLiquido"].sum().sort_values(ascending=False)
     )
 
     plt.figure(figsize=(10, 6))
