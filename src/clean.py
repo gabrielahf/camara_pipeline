@@ -126,26 +126,28 @@ def build_dataset_modelagem(
 
     # Agregação de despesas (usando valorLiquido_pos para ignorar estornos)
     if not df_desp.empty and "idDeputado" in df_desp.columns:
-        agg_desp = df_desp.groupby("idDeputado").agg(
-            gasto_total=("valorLiquido_pos", "sum"),
-            qtd_despesas=("valorLiquido_pos", "count"),
-            gasto_liquido=("valorLiquido", "sum"),  # incluindo negativos
-            qtd_estornos=("eh_estorno", "sum"),
-        ).reset_index()
+        agg_desp = (
+            df_desp.groupby("idDeputado")
+            .agg(
+                gasto_total=("valorLiquido_pos", "sum"),
+                qtd_despesas=("valorLiquido_pos", "count"),
+                gasto_liquido=("valorLiquido", "sum"),  # incluindo negativos
+                qtd_estornos=("eh_estorno", "sum"),
+            )
+            .reset_index()
+        )
         df = df.merge(agg_desp, on="idDeputado", how="left")
 
     # Contagem de proposições
     if not df_prop.empty and "idDeputado" in df_prop.columns:
-        agg_prop = df_prop.groupby("idDeputado").size().reset_index(
-            name="total_proposicoes"
+        agg_prop = (
+            df_prop.groupby("idDeputado").size().reset_index(name="total_proposicoes")
         )
         df = df.merge(agg_prop, on="idDeputado", how="left")
 
     # Contagem de eventos
     if not df_evt.empty and "idDeputado" in df_evt.columns:
-        agg_evt = df_evt.groupby("idDeputado").size().reset_index(
-            name="total_eventos"
-        )
+        agg_evt = df_evt.groupby("idDeputado").size().reset_index(name="total_eventos")
         df = df.merge(agg_evt, on="idDeputado", how="left")
 
     # Preenche NaN com 0 onde faz sentido
