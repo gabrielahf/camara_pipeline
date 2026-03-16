@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,7 +26,9 @@ def _ensure_id_deputado(df: pd.DataFrame) -> pd.DataFrame:
 
 def _ensure_ano_consulta(df: pd.DataFrame) -> pd.DataFrame:
     if "anoConsulta" in df.columns:
-        df["anoConsulta"] = pd.to_numeric(df["anoConsulta"], errors="coerce").astype("Int64")
+        df["anoConsulta"] = pd.to_numeric(df["anoConsulta"], errors="coerce").astype(
+            "Int64"
+        )
     return df
 
 
@@ -42,7 +43,9 @@ def clean_deputados() -> pd.DataFrame:
     df = _ensure_id_deputado(df)
     df = df.drop_duplicates(subset="idDeputado")
 
-    cols = [c for c in ["idDeputado", "nome", "siglaPartido", "siglaUf"] if c in df.columns]
+    cols = [
+        c for c in ["idDeputado", "nome", "siglaPartido", "siglaUf"] if c in df.columns
+    ]
     df = df[cols].copy()
 
     df.to_parquet(DATA_PROC / "deputados_clean.parquet", index=False)
@@ -150,7 +153,9 @@ def build_dataset_modelagem(
         df = df.merge(agg_desp, on="idDeputado", how="left")
 
     if not df_prop.empty and "idDeputado" in df_prop.columns:
-        agg_prop = df_prop.groupby("idDeputado").size().reset_index(name="total_proposicoes")
+        agg_prop = (
+            df_prop.groupby("idDeputado").size().reset_index(name="total_proposicoes")
+        )
         df = df.merge(agg_prop, on="idDeputado", how="left")
 
     if not df_evt.empty and "idDeputado" in df_evt.columns:
