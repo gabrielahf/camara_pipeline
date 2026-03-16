@@ -18,7 +18,6 @@ def clean_deputados() -> pd.DataFrame:
     df = pd.read_parquet(DATA_RAW / "deputados.parquet")
     df = df.drop_duplicates(subset="id")
 
-    df = df.rename(columns={"id": "idDeputado"})
     cols = ["idDeputado", "nome", "siglaPartido", "siglaUf"]
     df = df[cols]
 

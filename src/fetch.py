@@ -232,7 +232,7 @@ def main() -> None:
     df_deps.to_parquet(DATA_RAW / "deputados.parquet", index=False)
     deputados = df_deps["idDeputado"].astype(int).tolist()
     print(f"Saved deputados.parquet with {len(df_deps)} rows")
-
+'''
     print("Fetching Despesas...")
     fetch_dataset_by_deputado_ano(
         deputados=deputados,
@@ -254,7 +254,7 @@ def main() -> None:
         data_tmp_path=DATA_RAW / "proposicoes_tmp.parquet",
         progress_tmp_path=DATA_RAW / "proposicoes_progress.parquet",
     )
-
+'''
     print("Fetching Eventos...")
     fetch_dataset_by_deputado_ano(
         deputados=deputados,
