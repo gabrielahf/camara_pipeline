@@ -1,339 +1,372 @@
+
 from __future__ import annotations
+
 from pathlib import Path
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 
+# ==========================================================
+# Configuração de caminhos
+# ==========================================================
 
-# ==== CONFIGURAÇÃO DE CAMINHOS ====
-
-ROOT = Path(__file__).resolve().parents[1]  # pasta raiz do projeto
+ROOT = Path(__file__).resolve().parents[1]
 DATA_PROCESSED = ROOT / "data" / "processed"
+DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
 
+DEPUTADOS_PATH = DATA_PROCESSED / "deputados_clean.parquet"
 DESPESAS_PATH = DATA_PROCESSED / "despesas_clean.parquet"
 EVENTOS_PATH = DATA_PROCESSED / "eventos_clean.parquet"
 PROPS_PATH = DATA_PROCESSED / "proposicoes_clean.parquet"
 
 OUT_CSV = DATA_PROCESSED / "dataset_mestre_clean.csv"
 OUT_PARQUET = DATA_PROCESSED / "dataset_mestre_clean.parquet"
-
 DESP_CAT_CSV = DATA_PROCESSED / "despesas_categorizadas.csv"
 PLOT_CAT = DATA_PROCESSED / "gastos_por_categoria.png"
 
 
-# ==== CLASSIFICAÇÃO DE DESPESAS EM MACRO-CATEGORIAS ====
-
+# ==========================================================
+# Regras simples de categorização das despesas
+# ==========================================================
+# Observação: esta classificação é heurística (por palavras-chave).
+# É útil para exploração e dashboard, mas não substitui uma taxonomia oficial.
 
 GRUPOS_CATEGORIA = {
     "Transporte": [
         "bilhete", "passagem", "locomoção", "locomocao", "transporte",
         "aluguel de veículos", "aluguel de veiculos",
         "combustível", "combustivel", "taxi", "uber", "veículo", "veiculo",
-        "fretamento"
+        "fretamento",
     ],
-    "Alimentação": ["alimentação", "alimentacao", "restaurante", "refeição", "refeicao", "lanches"],
+    "Alimentação": [
+        "alimentação", "alimentacao", "restaurante", "refeição", "refeicao", "lanches",
+    ],
     "Escritório e Funcionamento": [
-        "escritório", "escritorio", "materiais", "serviços postais",
+        "escritório", "escritorio", "materiais", "serviços postais", "servicos postais",
         "correios", "telefone", "internet", "locação", "locacao",
         "espaço", "espaco", "condomínio", "condominio",
-        "copiadora", "material de expediente"
+        "copiadora", "material de expediente",
     ],
-    "Cursos e Capacitação": ["curso", "capacitação", "capacitação", "treinamento", "inscrição", "inscricao"],
+    "Cursos e Capacitação": [
+        "curso", "capacitação", "capacitacao", "treinamento", "inscrição", "inscricao",
+    ],
     "Divulgação do Mandato": [
-        "publicidade", "divulgação", "divulgacao",
-        "assessoria de imprensa", "marketing"
+        "publicidade", "divulgação", "divulgacao", "assessoria de imprensa", "marketing",
     ],
 }
 
 
 def _classificar_macro_categoria(desc: str) -> str:
+    """Classifica o texto de 'tipoDespesa' em uma macro-categoria."""
     if not isinstance(desc, str):
         return "Outros"
-    desc = desc.lower()
+
+    texto = desc.lower()
     for categoria, palavras in GRUPOS_CATEGORIA.items():
-        if any(p in desc for p in palavras):
+        if any(p in texto for p in palavras):
             return categoria
     return "Outros"
 
 
-def adicionar_categoria_macro(df_desp: pd.DataFrame) -> pd.DataFrame:
+# ==========================================================
+# Helpers simples para manter o código legível e robusto
+# ==========================================================
+
+
+def _normalizar_id_deputado(df: pd.DataFrame, nome_df: str) -> pd.DataFrame:
     """
-    Garante a coluna 'categoria_macro' em df_desp, usando 'tipoDespesa'.
-    Também salva um CSV detalhado com as despesas categorizadas.
+    Garante a presença de 'idDeputado' em formato numérico.
+    Mantém a lógica simples para ficar fácil de explicar.
     """
-    print("\nClassificando despesas em macro-categorias...")
+    if "idDeputado" not in df.columns:
+        raise ValueError(f"Coluna 'idDeputado' não encontrada em {nome_df}.")
 
-    if "tipoDespesa" not in df_desp.columns:
-        print("  Aviso: coluna 'tipoDespesa' não encontrada em despesas_clean. "
-              "Não será criada categoria_macro.")
-        df_desp["categoria_macro"] = "Outros"
-        return df_desp
-
-    df = df_desp.copy()
-    df["tipoDespesa"] = df["tipoDespesa"].astype(str).str.lower()
-    df["categoria_macro"] = df["tipoDespesa"].apply(_classificar_macro_categoria)
-
-    # salva CSV categorizado (para análises extras / dashboard)
-    DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
-    df.to_csv(DESP_CAT_CSV, index=False, encoding="utf-8-sig")
-    print(f"  ✅ Arquivo de despesas categorizadas salvo em: {DESP_CAT_CSV}")
-
+    df = df.copy()
+    df["idDeputado"] = pd.to_numeric(df["idDeputado"], errors="coerce")
+    df = df.dropna(subset=["idDeputado"])
+    df["idDeputado"] = df["idDeputado"].astype(int)
     return df
 
 
-def plot_gastos_por_categoria(df_desp: pd.DataFrame) -> None:
-    """
-    Gera gráfico de barras de gastos por macro-categoria
-    e salva em PNG.
-    """
-    print("\nGerando gráfico de gastos por categoria_macro...")
 
-    if "categoria_macro" not in df_desp.columns:
-        print("  Aviso: 'categoria_macro' não existe em df_desp. Gráfico não será gerado.")
-        return
-
-    if "valorLiquido" not in df_desp.columns:
-        print("  Aviso: 'valorLiquido' não existe em df_desp. Gráfico não será gerado.")
-        return
-
-    df = df_desp.copy()
-    df["valorLiquido"] = pd.to_numeric(df["valorLiquido"], errors="coerce").fillna(0.0)
-
-    agrupado = (
-        df.groupby("categoria_macro")["valorLiquido"]
-        .sum()
-        .sort_values(ascending=False)
-    )
-
-    plt.figure(figsize=(10, 6))
-    plt.bar(agrupado.index, agrupado.values)
-    plt.xticks(rotation=45, ha="right")
-    plt.ylabel("Total gasto (R$)")
-    plt.title("Gastos por Macro-Categoria (Câmara dos Deputados)")
-    plt.tight_layout()
-
-    plt.savefig(PLOT_CAT, dpi=150)
-    plt.close()
-
-    print(f"  ✅ Gráfico salvo em: {PLOT_CAT}")
-    print(agrupado)
+def _slug_coluna(texto: str) -> str:
+    """Converte nomes de categorias em nomes de colunas simples."""
+    mapa = str.maketrans({
+        "á": "a", "à": "a", "ã": "a", "â": "a",
+        "é": "e", "ê": "e",
+        "í": "i",
+        "ó": "o", "ô": "o", "õ": "o",
+        "ú": "u",
+        "ç": "c",
+        "-": "_", "/": "_",
+    })
+    return texto.lower().translate(mapa).replace(" ", "_")
 
 
-# ==== CARREGAMENTO ====
 
-def load_parquets() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def _carregar_arquivos() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Lê os parquets limpos produzidos por clean.py."""
     print("Lendo arquivos limpos (.parquet)...")
 
+    df_deps = pd.read_parquet(DEPUTADOS_PATH)
     df_desp = pd.read_parquet(DESPESAS_PATH)
     df_evt = pd.read_parquet(EVENTOS_PATH)
     df_prop = pd.read_parquet(PROPS_PATH)
 
+    print(f"  deputados_clean:   {len(df_deps):,} linhas")
     print(f"  despesas_clean:    {len(df_desp):,} linhas")
     print(f"  eventos_clean:     {len(df_evt):,} linhas")
     print(f"  proposicoes_clean: {len(df_prop):,} linhas")
 
-    return df_desp, df_evt, df_prop
+    return df_deps, df_desp, df_evt, df_prop
 
 
-# ==== AGREGAÇÕES ====
+# ==========================================================
+# Etapa 1: Categorizar despesas + salvar CSV detalhado
+# ==========================================================
+
+
+def adicionar_categoria_macro(df_desp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cria a coluna 'categoria_macro' a partir de 'tipoDespesa'.
+    Também salva um CSV detalhado para análise exploratória e dashboard.
+    """
+    print("\nClassificando despesas em macro-categorias...")
+
+    df = df_desp.copy()
+    if "tipoDespesa" not in df.columns:
+        print("  Aviso: coluna 'tipoDespesa' não encontrada. Todas as despesas ficarão em 'Outros'.")
+        df["categoria_macro"] = "Outros"
+    else:
+        df["tipoDespesa"] = df["tipoDespesa"].astype(str).str.lower()
+        df["categoria_macro"] = df["tipoDespesa"].apply(_classificar_macro_categoria)
+
+    df.to_csv(DESP_CAT_CSV, index=False, encoding="utf-8-sig")
+    print(f"  ✅ Arquivo salvo: {DESP_CAT_CSV}")
+    return df
+
+
+# ==========================================================
+# Etapa 2: Gráfico simples de apoio à EDA
+# ==========================================================
+
+
+def plot_gastos_por_categoria(df_desp: pd.DataFrame) -> None:
+    """
+    Gera um gráfico simples de apoio à EDA.
+    Usa valorLiquido_pos quando existir, para evitar que estornos distorçam o total gasto.
+    """
+    print("\nGerando gráfico de gastos por macro-categoria...")
+
+    if "categoria_macro" not in df_desp.columns:
+        print("  Aviso: coluna 'categoria_macro' não encontrada. Gráfico não será gerado.")
+        return
+
+    if "valorLiquido_pos" in df_desp.columns:
+        valor_col = "valorLiquido_pos"
+    elif "valorLiquido" in df_desp.columns:
+        df_desp = df_desp.copy()
+        df_desp["valorLiquido"] = pd.to_numeric(df_desp["valorLiquido"], errors="coerce").fillna(0.0)
+        df_desp["valorLiquido_pos"] = df_desp["valorLiquido"].clip(lower=0.0)
+        valor_col = "valorLiquido_pos"
+    else:
+        print("  Aviso: nenhuma coluna de valor encontrada. Gráfico não será gerado.")
+        return
+
+    agrupado = (
+        df_desp.groupby("categoria_macro")[valor_col]
+        .sum()
+        .sort_values(ascending=True)
+    )
+
+    plt.figure(figsize=(10, 6))
+    plt.barh(agrupado.index, agrupado.values, color="#4472C4")
+    plt.xlabel("Total gasto positivo (R$)")
+    plt.ylabel("Macro-categoria")
+    plt.title("Gastos por Macro-Categoria (Câmara dos Deputados)")
+    plt.tight_layout()
+    plt.savefig(PLOT_CAT, dpi=150)
+    plt.close()
+
+    print(f"  ✅ Gráfico salvo: {PLOT_CAT}")
+
+
+# ==========================================================
+# Etapa 3: Agregações por deputado
+# ==========================================================
+
 
 def agregar_despesas(df_desp: pd.DataFrame) -> pd.DataFrame:
     """
-    Agrega despesas por deputado (e por categoria_macro, se existir).
-    Espera ao menos:
-      - idDeputado
-      - valorLiquido
-      - (opcional) categoria_macro
+    Agrega despesas por deputado.
+    Mantém duas visões importantes:
+      - gasto_total: soma apenas dos valores positivos
+      - gasto_liquido: soma considerando estornos/ajustes negativos
+    Se houver categoria_macro, cria também colunas por categoria.
     """
     print("\nAgregando despesas...")
 
-    if "idDeputado" not in df_desp.columns:
-        raise ValueError("Coluna 'idDeputado' não encontrada em despesas_clean.parquet")
+    df = _normalizar_id_deputado(df_desp, "despesas_clean.parquet")
+    df = df.copy()
 
-    if "valorLiquido" not in df_desp.columns:
+    if "valorLiquido" not in df.columns:
         raise ValueError("Coluna 'valorLiquido' não encontrada em despesas_clean.parquet")
 
-    # garantir numérico
-    df_desp["valorLiquido"] = pd.to_numeric(df_desp["valorLiquido"], errors="coerce").fillna(0.0)
+    df["valorLiquido"] = pd.to_numeric(df["valorLiquido"], errors="coerce").fillna(0.0)
 
-    # diagnóstico de valores negativos
-    n_negativos = (df_desp["valorLiquido"] < 0).sum()
+    # Se clean.py já criou valorLiquido_pos e eh_estorno, usamos essas colunas.
+    # Caso contrário, recriamos aqui sem complicar a lógica.
+    if "valorLiquido_pos" not in df.columns:
+        df["valorLiquido_pos"] = df["valorLiquido"].clip(lower=0.0)
+    else:
+        df["valorLiquido_pos"] = pd.to_numeric(df["valorLiquido_pos"], errors="coerce").fillna(0.0)
+
+    if "eh_estorno" not in df.columns:
+        df["eh_estorno"] = df["valorLiquido"] < 0
+
+    n_negativos = int((df["valorLiquido"] < 0).sum())
     if n_negativos > 0:
-        print(f"  Aviso: {n_negativos} registros de despesa com valor negativo (possíveis estornos)")
+        print(f"  Aviso: {n_negativos} registros com valor negativo (possíveis estornos).")
 
-    # agregação básica por deputado
     agg = (
-        df_desp
-        .groupby("idDeputado", as_index=False)
+        df.groupby("idDeputado", as_index=False)
         .agg(
-            gasto_total=("valorLiquido", "sum"),
+            gasto_total=("valorLiquido_pos", "sum"),
+            gasto_liquido=("valorLiquido", "sum"),
             qtd_despesas=("valorLiquido", "size"),
+            qtd_estornos=("eh_estorno", "sum"),
         )
     )
 
-    # se tiver coluna de categoria macro, gera colunas wide por categoria
-    if "categoria_macro" in df_desp.columns:
-        print("  Encontrada coluna 'categoria_macro' -> agregando por categoria...")
-
+    # Gastos por macro-categoria (também usando apenas os valores positivos)
+    if "categoria_macro" in df.columns:
+        print("  Encontrada 'categoria_macro' -> agregando gastos por categoria...")
         pivot_cat = (
-            df_desp
-            .groupby(["idDeputado", "categoria_macro"])["valorLiquido"]
+            df.groupby(["idDeputado", "categoria_macro"])["valorLiquido_pos"]
             .sum()
             .reset_index()
-            .pivot(index="idDeputado", columns="categoria_macro", values="valorLiquido")
+            .pivot(index="idDeputado", columns="categoria_macro", values="valorLiquido_pos")
             .fillna(0.0)
         )
 
-        pivot_cat.columns = [
-            f"gasto_{str(c).lower().replace(' ', '_')}"
-            for c in pivot_cat.columns
-        ]
+        pivot_cat.columns = [f"gasto_{_slug_coluna(col)}" for col in pivot_cat.columns]
         pivot_cat = pivot_cat.reset_index()
-
         agg = agg.merge(pivot_cat, on="idDeputado", how="left")
 
     return agg
 
 
-def agregar_eventos(df_evt: pd.DataFrame) -> pd.DataFrame:
-    """
-    Agrega eventos por deputado.
-    Espera ao menos:
-      - idDeputado
-    """
-    print("\nAgregando eventos...")
 
-    if "idDeputado" not in df_evt.columns:
-        raise ValueError("Coluna 'idDeputado' não encontrada em eventos_clean.parquet")
+def agregar_eventos(df_evt: pd.DataFrame) -> pd.DataFrame:
+    """Agrega o número total de eventos por deputado."""
+    print("\nAgregando eventos...")
+    df = _normalizar_id_deputado(df_evt, "eventos_clean.parquet")
 
     agg_evt = (
-        df_evt
-        .groupby("idDeputado", as_index=False)
+        df.groupby("idDeputado", as_index=False)
         .size()
         .rename(columns={"size": "total_eventos"})
     )
-
     return agg_evt
 
 
-def agregar_proposicoes(df_prop: pd.DataFrame) -> pd.DataFrame:
-    """
-    Agrega proposições por deputado.
-    Espera ao menos:
-      - idDeputado (ou coluna equivalente)
-    """
-    print("\nAgregando proposições...")
 
-    if "idDeputado" not in df_prop.columns:
-        possiveis = [c for c in df_prop.columns if "iddep" in c.lower() or "autor" in c.lower()]
-        if possiveis:
-            print(f"  Atenção: renomeando coluna '{possiveis[0]}' para 'idDeputado'")
-            df_prop = df_prop.rename(columns={possiveis[0]: "idDeputado"})
-        else:
-            raise ValueError(
-                "Nenhuma coluna parecida com 'idDeputado' encontrada em proposicoes_clean.parquet"
-            )
+def agregar_proposicoes(df_prop: pd.DataFrame) -> pd.DataFrame:
+    """Agrega o número total de proposições por deputado."""
+    print("\nAgregando proposições...")
+    df = _normalizar_id_deputado(df_prop, "proposicoes_clean.parquet")
 
     agg_prop = (
-        df_prop
-        .groupby("idDeputado", as_index=False)
+        df.groupby("idDeputado", as_index=False)
         .size()
         .rename(columns={"size": "total_proposicoes"})
     )
-
     return agg_prop
 
 
-# ==== DATASET MESTRE ====
+# ==========================================================
+# Etapa 4: Montar o dataset mestre
+# ==========================================================
+
 
 def montar_dataset_mestre(
+    df_deps: pd.DataFrame,
     df_desp_agg: pd.DataFrame,
     df_evt_agg: pd.DataFrame,
     df_prop_agg: pd.DataFrame,
 ) -> pd.DataFrame:
     """
-    Junta todas as agregações num único dataset mestre por deputado.
+    Junta metadados dos deputados com as agregações de despesas,
+    eventos e proposições.
+
+    A base principal é a tabela de deputados, pois assim preservamos
+    nome, partido e UF no dataset final.
     """
     print("\nMontando dataset mestre...")
 
-    ids = (
-        pd.concat(
-            [
-                df_desp_agg[["idDeputado"]],
-                df_evt_agg[["idDeputado"]],
-                df_prop_agg[["idDeputado"]],
-            ],
-            ignore_index=True,
-        )
-        .drop_duplicates()
-    )
+    df = _normalizar_id_deputado(df_deps, "deputados_clean.parquet").copy()
+    df = df.drop_duplicates(subset="idDeputado")
 
-    df = ids.copy()
     df = df.merge(df_desp_agg, on="idDeputado", how="left")
     df = df.merge(df_evt_agg, on="idDeputado", how="left")
     df = df.merge(df_prop_agg, on="idDeputado", how="left")
 
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    df[numeric_cols] = df[numeric_cols].fillna(0.0)
+    # Preenche nulos numéricos com zero, pois ausência de registros aqui
+    # significa ausência de despesa/atividade no período analisado.
+    numeric_cols = df.select_dtypes(include=["number", "bool"]).columns
+    df[numeric_cols] = df[numeric_cols].fillna(0)
 
-    for col in ["gasto_total", "qtd_despesas", "total_eventos", "total_proposicoes"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
-    if "total_proposicoes" in df.columns and "total_eventos" in df.columns:
-        df["atividade_composta"] = (
-            df["total_proposicoes"].astype(float)
-            + 0.3 * df["total_eventos"].astype(float)
-        )
-    else:
-        print("  Aviso: não foi possível criar 'atividade_composta' (faltam colunas).")
-        df["atividade_composta"] = 0.0
-
-    # gasto_total_ajustado
-    if "gasto_total" in df.columns:
-        df["gasto_total_ajustado"] = df["gasto_total"].clip(lower=0.0)
-        n_negativos = (df["gasto_total"] < 0).sum()
-        if n_negativos > 0:
-            print(f"  Info: {n_negativos} deputados com gasto_total negativo (ajustados para 0 em 'gasto_total_ajustado')")
-    else:
-        df["gasto_total_ajustado"] = 0.0
-
-    # flag sem despesa
-    df["sem_despesa"] = (
-        (df["gasto_total"].fillna(0.0) == 0.0)
-        & (df["qtd_despesas"].fillna(0.0) == 0.0)
+    # Métrica simples de atividade composta.
+    # Mantemos a fórmula já usada no projeto para facilitar a explicação.
+    df["atividade_composta"] = (
+        pd.to_numeric(df.get("total_proposicoes", 0), errors="coerce").fillna(0.0)
+        + 0.3 * pd.to_numeric(df.get("total_eventos", 0), errors="coerce").fillna(0.0)
     )
-    print(f"  Deputados sem despesa registrada: {df['sem_despesa'].sum()}")
 
-    # custo por atividade
-    df["custo_por_atividade"] = df["gasto_total_ajustado"] / (df["atividade_composta"] + 1e-6)
+    # Gasto total ajustado: evita valores negativos na métrica de custo.
+    df["gasto_total_ajustado"] = pd.to_numeric(df.get("gasto_total", 0), errors="coerce").fillna(0.0)
+    df["gasto_total_ajustado"] = df["gasto_total_ajustado"].clip(lower=0.0)
+
+    # Deputados sem despesa registrada.
+    df["sem_despesa"] = (
+        (pd.to_numeric(df.get("gasto_total", 0), errors="coerce").fillna(0.0) == 0.0)
+        & (pd.to_numeric(df.get("qtd_despesas", 0), errors="coerce").fillna(0.0) == 0.0)
+    )
+    print(f"  Deputados sem despesa registrada: {int(df['sem_despesa'].sum())}")
+
+    # Custo por atividade: quando não há atividade, deixamos 0 para manter a leitura simples.
+    denominador = df["atividade_composta"].replace(0, pd.NA)
+    df["custo_por_atividade"] = (df["gasto_total_ajustado"] / denominador).fillna(0.0)
 
     return df
 
 
-# ==== MAIN ====
+# ==========================================================
+# Main
+# ==========================================================
 
-def main():
-    df_desp, df_evt, df_prop = load_parquets()
 
-    # 1) garantir macro-categorias + salvar CSV detalhado
+def main() -> None:
+    df_deps, df_desp, df_evt, df_prop = _carregar_arquivos()
+
+    # 1) Categoriza despesas e salva o CSV detalhado
     df_desp = adicionar_categoria_macro(df_desp)
 
-    # 2) gerar gráfico geral de gastos por macro-categoria
+    # 2) Gera um gráfico simples de apoio à EDA
     plot_gastos_por_categoria(df_desp)
 
-    # 3) agregações para dataset mestre
+    # 3) Agrega os dados por deputado
     df_desp_agg = agregar_despesas(df_desp)
     df_evt_agg = agregar_eventos(df_evt)
     df_prop_agg = agregar_proposicoes(df_prop)
 
-    df_mestre = montar_dataset_mestre(df_desp_agg, df_evt_agg, df_prop_agg)
+    # 4) Monta o dataset mestre preservando nome, partido e UF
+    df_mestre = montar_dataset_mestre(df_deps, df_desp_agg, df_evt_agg, df_prop_agg)
 
-    DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
+    # 5) Salva os resultados finais
     df_mestre.to_csv(OUT_CSV, index=False)
     df_mestre.to_parquet(OUT_PARQUET, index=False)
 
-    print("\n✅ Dataset mestre (limpo) gerado com sucesso!")
+    print("\n✅ Dataset mestre gerado com sucesso!")
     print(f"  CSV:     {OUT_CSV}")
     print(f"  PARQUET: {OUT_PARQUET}")
     print(f"  Linhas:  {len(df_mestre):,}")
