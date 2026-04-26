@@ -35,3 +35,4 @@ eggs/
 *.py~ 
 *.swp
 .DS_Store
+*.zip
