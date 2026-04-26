@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import json
@@ -44,6 +43,7 @@ COLOR_ACCENT = "#E45756"
 # Carregamento
 # ==========================================================
 
+
 def load_dataset() -> pd.DataFrame:
     """Carrega o dataset mestre limpo, priorizando o parquet."""
     if DATASET_PARQUET.exists():
@@ -51,7 +51,6 @@ def load_dataset() -> pd.DataFrame:
     if DATASET_CSV.exists():
         return pd.read_csv(DATASET_CSV)
     raise FileNotFoundError("Nenhum dataset mestre encontrado em data/processed/.")
-
 
 
 def load_categorized_expenses() -> pd.DataFrame | None:
@@ -64,6 +63,7 @@ def load_categorized_expenses() -> pd.DataFrame | None:
 # ==========================================================
 # Preparação básica
 # ==========================================================
+
 
 def prepare_master_dataset(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -90,10 +90,11 @@ def prepare_master_dataset(df: pd.DataFrame) -> pd.DataFrame:
 
     # Recria atividade_composta se necessário
     if "atividade_composta" not in df.columns:
-        df["atividade_composta"] = (
-            pd.to_numeric(df.get("total_proposicoes", 0), errors="coerce").fillna(0.0)
-            + 0.3 * pd.to_numeric(df.get("total_eventos", 0), errors="coerce").fillna(0.0)
-        )
+        df["atividade_composta"] = pd.to_numeric(
+            df.get("total_proposicoes", 0), errors="coerce"
+        ).fillna(0.0) + 0.3 * pd.to_numeric(
+            df.get("total_eventos", 0), errors="coerce"
+        ).fillna(0.0)
 
     # Transformação log para gasto total (útil em distribuições assimétricas)
     if "gasto_total" in df.columns:
@@ -104,9 +105,7 @@ def prepare_master_dataset(df: pd.DataFrame) -> pd.DataFrame:
     # Remove infinitos em métricas derivadas
     if "custo_por_atividade" in df.columns:
         df["custo_por_atividade"] = (
-            df["custo_por_atividade"]
-            .replace([np.inf, -np.inf], np.nan)
-            .fillna(0.0)
+            df["custo_por_atividade"].replace([np.inf, -np.inf], np.nan).fillna(0.0)
         )
 
     # Preenche metadados principais, se existirem
@@ -132,6 +131,7 @@ def prepare_master_dataset(df: pd.DataFrame) -> pd.DataFrame:
 # Utilitários de exportação
 # ==========================================================
 
+
 def save_plotly_figure(fig: go.Figure, name: str) -> None:
     """
     Salva a figura em HTML interativo, JSON (para app.py) e tenta PNG estático.
@@ -150,28 +150,51 @@ def save_plotly_figure(fig: go.Figure, name: str) -> None:
         pass
 
 
-
 def export_summary(df: pd.DataFrame) -> None:
     """Salva um resumo numérico simples para apoiar o relatório."""
     summary = {
         "n_deputados": int(len(df)),
         "gasto_total": {
-            "media": float(df["gasto_total"].mean()) if "gasto_total" in df.columns else 0.0,
-            "mediana": float(df["gasto_total"].median()) if "gasto_total" in df.columns else 0.0,
-            "q1": float(df["gasto_total"].quantile(0.25)) if "gasto_total" in df.columns else 0.0,
-            "q3": float(df["gasto_total"].quantile(0.75)) if "gasto_total" in df.columns else 0.0,
-            "max": float(df["gasto_total"].max()) if "gasto_total" in df.columns else 0.0,
+            "media": float(df["gasto_total"].mean())
+            if "gasto_total" in df.columns
+            else 0.0,
+            "mediana": float(df["gasto_total"].median())
+            if "gasto_total" in df.columns
+            else 0.0,
+            "q1": float(df["gasto_total"].quantile(0.25))
+            if "gasto_total" in df.columns
+            else 0.0,
+            "q3": float(df["gasto_total"].quantile(0.75))
+            if "gasto_total" in df.columns
+            else 0.0,
+            "max": float(df["gasto_total"].max())
+            if "gasto_total" in df.columns
+            else 0.0,
         },
         "atividade_composta": {
-            "media": float(df["atividade_composta"].mean()) if "atividade_composta" in df.columns else 0.0,
-            "mediana": float(df["atividade_composta"].median()) if "atividade_composta" in df.columns else 0.0,
-            "max": float(df["atividade_composta"].max()) if "atividade_composta" in df.columns else 0.0,
+            "media": float(df["atividade_composta"].mean())
+            if "atividade_composta" in df.columns
+            else 0.0,
+            "mediana": float(df["atividade_composta"].median())
+            if "atividade_composta" in df.columns
+            else 0.0,
+            "max": float(df["atividade_composta"].max())
+            if "atividade_composta" in df.columns
+            else 0.0,
         },
         "custo_por_atividade": {
-            "media": float(df["custo_por_atividade"].mean()) if "custo_por_atividade" in df.columns else 0.0,
-            "mediana": float(df["custo_por_atividade"].median()) if "custo_por_atividade" in df.columns else 0.0,
-            "q3": float(df["custo_por_atividade"].quantile(0.75)) if "custo_por_atividade" in df.columns else 0.0,
-            "max": float(df["custo_por_atividade"].max()) if "custo_por_atividade" in df.columns else 0.0,
+            "media": float(df["custo_por_atividade"].mean())
+            if "custo_por_atividade" in df.columns
+            else 0.0,
+            "mediana": float(df["custo_por_atividade"].median())
+            if "custo_por_atividade" in df.columns
+            else 0.0,
+            "q3": float(df["custo_por_atividade"].quantile(0.75))
+            if "custo_por_atividade" in df.columns
+            else 0.0,
+            "max": float(df["custo_por_atividade"].max())
+            if "custo_por_atividade" in df.columns
+            else 0.0,
         },
     }
 
@@ -185,17 +208,21 @@ def export_summary(df: pd.DataFrame) -> None:
 # Helpers para as visualizações “spicy”
 # ==========================================================
 
+
 def _positive_value_column(df: pd.DataFrame) -> str | None:
     """Define a melhor coluna monetária positiva para análises de despesa."""
     if "valorLiquido_pos" in df.columns:
-        df["valorLiquido_pos"] = pd.to_numeric(df["valorLiquido_pos"], errors="coerce").fillna(0.0)
+        df["valorLiquido_pos"] = pd.to_numeric(
+            df["valorLiquido_pos"], errors="coerce"
+        ).fillna(0.0)
         return "valorLiquido_pos"
     if "valorLiquido" in df.columns:
-        df["valorLiquido"] = pd.to_numeric(df["valorLiquido"], errors="coerce").fillna(0.0)
+        df["valorLiquido"] = pd.to_numeric(df["valorLiquido"], errors="coerce").fillna(
+            0.0
+        )
         df["valor_eda"] = df["valorLiquido"].clip(lower=0.0)
         return "valor_eda"
     return None
-
 
 
 def _pick_time_column(df: pd.DataFrame) -> str | None:
@@ -207,8 +234,9 @@ def _pick_time_column(df: pd.DataFrame) -> str | None:
     return None
 
 
-
-def _build_party_category_matrix(df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
+def _build_party_category_matrix(
+    df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame, top_n: int = 10
+) -> pd.DataFrame:
     """Monta a matriz partido x categoria usada no heatmap e em outras análises."""
     base = df_desp_cat.copy()
     base["idDeputado"] = pd.to_numeric(base["idDeputado"], errors="coerce")
@@ -219,7 +247,9 @@ def _build_party_category_matrix(df_mestre: pd.DataFrame, df_desp_cat: pd.DataFr
     if valor_col is None:
         return pd.DataFrame()
 
-    meta = df_mestre[[c for c in ["idDeputado", "siglaPartido"] if c in df_mestre.columns]].drop_duplicates()
+    meta = df_mestre[
+        [c for c in ["idDeputado", "siglaPartido"] if c in df_mestre.columns]
+    ].drop_duplicates()
     base = base.merge(meta, on="idDeputado", how="left")
     base["siglaPartido"] = base["siglaPartido"].fillna("Desconhecido")
 
@@ -228,8 +258,7 @@ def _build_party_category_matrix(df_mestre: pd.DataFrame, df_desp_cat: pd.DataFr
         .sum()
         .sort_values(ascending=False)
         .head(top_n)
-        .index
-        .tolist()
+        .index.tolist()
     )
 
     matriz = (
@@ -244,6 +273,7 @@ def _build_party_category_matrix(df_mestre: pd.DataFrame, df_desp_cat: pd.DataFr
 # ==========================================================
 # 1) Distribuições e outliers (existentes)
 # ==========================================================
+
 
 def plot_histograms(df: pd.DataFrame) -> None:
     """Gera histogramas para gasto total e log(gasto total)."""
@@ -261,8 +291,18 @@ def plot_histograms(df: pd.DataFrame) -> None:
         labels={"gasto_total_plot": "Gasto total positivo (R$)", "count": "Frequência"},
         color_discrete_sequence=[COLOR_PRIMARY],
     )
-    fig.add_vline(x=valores.mean(), line_dash="dash", line_color=COLOR_ACCENT, annotation_text="Média")
-    fig.add_vline(x=valores.median(), line_dash="dash", line_color=COLOR_TERTIARY, annotation_text="Mediana")
+    fig.add_vline(
+        x=valores.mean(),
+        line_dash="dash",
+        line_color=COLOR_ACCENT,
+        annotation_text="Média",
+    )
+    fig.add_vline(
+        x=valores.median(),
+        line_dash="dash",
+        line_color=COLOR_TERTIARY,
+        annotation_text="Mediana",
+    )
     fig.update_layout(bargap=0.05)
     save_plotly_figure(fig, "hist_gasto_total")
 
@@ -276,11 +316,20 @@ def plot_histograms(df: pd.DataFrame) -> None:
         labels={"log_gasto_total": "log(1 + gasto total)", "count": "Frequência"},
         color_discrete_sequence=[COLOR_SECONDARY],
     )
-    fig.add_vline(x=float(log_valores.mean()), line_dash="dash", line_color=COLOR_ACCENT, annotation_text="Média")
-    fig.add_vline(x=float(log_valores.median()), line_dash="dash", line_color=COLOR_TERTIARY, annotation_text="Mediana")
+    fig.add_vline(
+        x=float(log_valores.mean()),
+        line_dash="dash",
+        line_color=COLOR_ACCENT,
+        annotation_text="Média",
+    )
+    fig.add_vline(
+        x=float(log_valores.median()),
+        line_dash="dash",
+        line_color=COLOR_TERTIARY,
+        annotation_text="Mediana",
+    )
     fig.update_layout(bargap=0.05)
     save_plotly_figure(fig, "hist_log_gasto_total")
-
 
 
 def plot_boxplots(df: pd.DataFrame) -> None:
@@ -315,6 +364,7 @@ def plot_boxplots(df: pd.DataFrame) -> None:
 # ==========================================================
 # 2) Comparações por grupos (existentes)
 # ==========================================================
+
 
 def plot_parties(df: pd.DataFrame, top_n: int = 10) -> None:
     """Compara partidos por gasto total e distribuição de gasto."""
@@ -356,7 +406,6 @@ def plot_parties(df: pd.DataFrame, top_n: int = 10) -> None:
     save_plotly_figure(fig, "boxplot_gasto_por_partido_top10")
 
 
-
 def plot_ufs(df: pd.DataFrame, top_n: int = 15) -> None:
     """Compara UFs pelo gasto médio por deputado."""
     if "siglaUf" not in df.columns or "gasto_total" not in df.columns:
@@ -386,6 +435,7 @@ def plot_ufs(df: pd.DataFrame, top_n: int = 15) -> None:
 # 3) Relações entre variáveis (existentes)
 # ==========================================================
 
+
 def plot_scatter_gasto_atividade(df: pd.DataFrame, n_rotulos: int = 8) -> None:
     """
     Scatter principal da EDA.
@@ -396,7 +446,15 @@ def plot_scatter_gasto_atividade(df: pd.DataFrame, n_rotulos: int = 8) -> None:
         return
 
     hover_cols = [
-        c for c in ["nome", "siglaPartido", "siglaUf", "gasto_total", "atividade_composta", "custo_por_atividade"]
+        c
+        for c in [
+            "nome",
+            "siglaPartido",
+            "siglaUf",
+            "gasto_total",
+            "atividade_composta",
+            "custo_por_atividade",
+        ]
         if c in df.columns
     ]
 
@@ -413,7 +471,9 @@ def plot_scatter_gasto_atividade(df: pd.DataFrame, n_rotulos: int = 8) -> None:
         },
         opacity=0.7,
     )
-    fig.update_traces(marker=dict(color=COLOR_PRIMARY, size=8, line=dict(color="white", width=0.5)))
+    fig.update_traces(
+        marker=dict(color=COLOR_PRIMARY, size=8, line=dict(color="white", width=0.5))
+    )
 
     x = df["log_gasto_total"].to_numpy(dtype=float)
     y = df["atividade_composta"].to_numpy(dtype=float)
@@ -452,11 +512,11 @@ def plot_scatter_gasto_atividade(df: pd.DataFrame, n_rotulos: int = 8) -> None:
     save_plotly_figure(fig, "scatter_gasto_atividade_log")
 
 
-
 def plot_correlation_heatmap(df: pd.DataFrame) -> None:
     """Heatmap simples de correlação entre variáveis numéricas principais."""
     cols = [
-        c for c in [
+        c
+        for c in [
             "gasto_total",
             "gasto_liquido",
             "qtd_despesas",
@@ -489,14 +549,20 @@ def plot_correlation_heatmap(df: pd.DataFrame) -> None:
 # 4) Composição por partido (existente e também conta no lineup)
 # ==========================================================
 
-def plot_party_category_heatmap(df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame | None, top_n: int = 10) -> None:
+
+def plot_party_category_heatmap(
+    df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame | None, top_n: int = 10
+) -> None:
     """
     Heatmap partido x categoria de despesa.
     Útil para mostrar perfis de gasto e diferenças de composição entre grupos.
     """
     if df_desp_cat is None:
         return
-    if "idDeputado" not in df_desp_cat.columns or "categoria_macro" not in df_desp_cat.columns:
+    if (
+        "idDeputado" not in df_desp_cat.columns
+        or "categoria_macro" not in df_desp_cat.columns
+    ):
         return
     if "siglaPartido" not in df_mestre.columns:
         return
@@ -520,18 +586,29 @@ def plot_party_category_heatmap(df_mestre: pd.DataFrame, df_desp_cat: pd.DataFra
 # 5) Anomalias / rankings (existentes)
 # ==========================================================
 
+
 def export_anomaly_tables(df: pd.DataFrame, top_n: int = 15) -> None:
     """Exporta tabelas simples para discutir outliers e casos extremos no relatório."""
-    cols_base = [c for c in ["idDeputado", "nome", "siglaPartido", "siglaUf"] if c in df.columns]
+    cols_base = [
+        c for c in ["idDeputado", "nome", "siglaPartido", "siglaUf"] if c in df.columns
+    ]
 
     if "gasto_total" in df.columns:
-        cols = cols_base + [c for c in ["gasto_total", "atividade_composta", "custo_por_atividade"] if c in df.columns]
+        cols = cols_base + [
+            c
+            for c in ["gasto_total", "atividade_composta", "custo_por_atividade"]
+            if c in df.columns
+        ]
         df[cols].sort_values("gasto_total", ascending=False).head(top_n).to_csv(
             EDA_DIR / "anomalias_top_gasto_total.csv", index=False
         )
 
     if "custo_por_atividade" in df.columns:
-        cols = cols_base + [c for c in ["custo_por_atividade", "gasto_total", "atividade_composta"] if c in df.columns]
+        cols = cols_base + [
+            c
+            for c in ["custo_por_atividade", "gasto_total", "atividade_composta"]
+            if c in df.columns
+        ]
         (
             df[df.get("atividade_composta", 0) > 0][cols]
             .sort_values("custo_por_atividade", ascending=False)
@@ -540,7 +617,11 @@ def export_anomaly_tables(df: pd.DataFrame, top_n: int = 15) -> None:
         )
 
     if "qtd_estornos" in df.columns:
-        cols = cols_base + [c for c in ["qtd_estornos", "gasto_liquido", "gasto_total"] if c in df.columns]
+        cols = cols_base + [
+            c
+            for c in ["qtd_estornos", "gasto_liquido", "gasto_total"]
+            if c in df.columns
+        ]
         df[cols].sort_values("qtd_estornos", ascending=False).head(top_n).to_csv(
             EDA_DIR / "anomalias_top_estornos.csv", index=False
         )
@@ -549,6 +630,7 @@ def export_anomaly_tables(df: pd.DataFrame, top_n: int = 15) -> None:
 # ==========================================================
 # 6 plots “spicy” adicionados
 # ==========================================================
+
 
 def plot_treemap_party_uf_deputado(df: pd.DataFrame, top_n: int = 120) -> None:
     """
@@ -561,7 +643,11 @@ def plot_treemap_party_uf_deputado(df: pd.DataFrame, top_n: int = 120) -> None:
 
     base = df.copy()
     base = base.sort_values("gasto_total", ascending=False).head(top_n)
-    color_col = "custo_por_atividade" if "custo_por_atividade" in base.columns else "atividade_composta"
+    color_col = (
+        "custo_por_atividade"
+        if "custo_por_atividade" in base.columns
+        else "atividade_composta"
+    )
 
     fig = px.treemap(
         base,
@@ -574,11 +660,12 @@ def plot_treemap_party_uf_deputado(df: pd.DataFrame, top_n: int = 120) -> None:
         hover_data={
             "gasto_total": ":.2f",
             color_col: ":.2f",
-            "atividade_composta": True if "atividade_composta" in base.columns else False,
+            "atividade_composta": True
+            if "atividade_composta" in base.columns
+            else False,
         },
     )
     save_plotly_figure(fig, "treemap_partido_uf_deputado")
-
 
 
 def plot_beeswarm_activity_by_party(df: pd.DataFrame, top_n: int = 10) -> None:
@@ -594,8 +681,7 @@ def plot_beeswarm_activity_by_party(df: pd.DataFrame, top_n: int = 10) -> None:
         .sum()
         .sort_values(ascending=False)
         .head(top_n)
-        .index
-        .tolist()
+        .index.tolist()
     )
     base = df[df["siglaPartido"].isin(top_parties)].copy()
     color_col = "custo_por_atividade" if "custo_por_atividade" in base.columns else None
@@ -605,21 +691,27 @@ def plot_beeswarm_activity_by_party(df: pd.DataFrame, top_n: int = 10) -> None:
         x="siglaPartido",
         y="atividade_composta",
         color=color_col,
-        hover_data=[c for c in ["nome", "siglaUf", "gasto_total", "custo_por_atividade"] if c in base.columns],
+        hover_data=[
+            c
+            for c in ["nome", "siglaUf", "gasto_total", "custo_por_atividade"]
+            if c in base.columns
+        ],
         template=PLOTLY_TEMPLATE,
         title=f"Beeswarm / Strip: atividade composta nos top {top_n} partidos",
         labels={"siglaPartido": "Partido", "atividade_composta": "Atividade composta"},
         category_orders={"siglaPartido": top_parties},
-        )
-    fig.update_traces(jitter=0.45, marker=dict(size=8, opacity=0.75, line=dict(width=0.4, color="white")))
+    )
+    fig.update_traces(
+        jitter=0.45,
+        marker=dict(size=8, opacity=0.75, line=dict(width=0.4, color="white")),
+    )
     save_plotly_figure(fig, "beeswarm_atividade_por_partido")
 
 
-
-def plot_parallel_coordinates_profiles(df: pd.DataFrame, max_rows: int = 150) -> None:
+def plot_parallel_coordinates_profiles(df: pd.DataFrame, max_rows: int = 150, top_n_parties: int = 10) -> None:
     """
-    Parallel coordinates para inspecionar perfis multivariados de deputados.
-    Seleciona um subconjunto para manter legibilidade.
+    Parallel coordinates com eixos compartilhados corretos.
+    A cor representa partido, mas a filtragem deve ser feita fora da legenda.
     """
     cols = [
         c for c in [
@@ -627,32 +719,116 @@ def plot_parallel_coordinates_profiles(df: pd.DataFrame, max_rows: int = 150) ->
             "gasto_liquido",
             "qtd_despesas",
             "qtd_estornos",
-            "total_proposicoes",
-            "total_eventos",
-            "atividade_composta",
             "custo_por_atividade",
         ]
         if c in df.columns
     ]
-    if len(cols) < 4:
+    if len(cols) < 4 or "siglaPartido" not in df.columns or "gasto_total" not in df.columns:
         return
 
-    base = df.copy().sort_values("gasto_total", ascending=False).head(max_rows)
-    color_col = "gasto_total" if "gasto_total" in base.columns else cols[0]
+    base = df.copy()
 
-    fig = px.parallel_coordinates(
-        base,
-        dimensions=cols,
-        color=color_col,
-        color_continuous_scale=px.colors.sequential.Tealgrn,
-        template=PLOTLY_TEMPLATE,
-        title="Parallel coordinates: perfis multivariados de deputados",
+    top_parties = (
+        base.groupby("siglaPartido")["gasto_total"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(top_n_parties)
+        .index
+        .tolist()
     )
+
+    base = base[base["siglaPartido"].isin(top_parties)].copy()
+    if base.empty:
+        return
+
+    if len(base) > max_rows:
+        base = (
+            base.sort_values("gasto_total", ascending=False)
+            .groupby("siglaPartido", group_keys=False)
+            .head(max_rows // max(len(top_parties), 1) + 1)
+        )
+
+    base["partido_code"] = pd.Categorical(
+        base["siglaPartido"],
+        categories=top_parties,
+        ordered=True
+    ).codes
+
+    palette = px.colors.qualitative.Bold
+    party_colors = {
+        party: palette[i % len(palette)]
+        for i, party in enumerate(top_parties)
+    }
+
+    n = max(len(top_parties) - 1, 1)
+    colorscale = [[i / n, party_colors[p]] for i, p in enumerate(top_parties)]
+
+    label_map = {
+        "gasto_total": "Gasto total",
+        "gasto_liquido": "Gasto líquido",
+        "qtd_despesas": "Qtd. despesas",
+        "qtd_estornos": "Qtd. estornos",
+        "total_proposicoes": "Total proposições",
+        "total_eventos": "Total eventos",
+        "atividade_composta": "Atividade composta",
+        "custo_por_atividade": "Custo por atividade",
+    }
+
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Parcoords(
+            line=dict(
+                color=base["partido_code"],
+                colorscale=colorscale,
+                cmin=0,
+                cmax=n,
+                showscale=False,
+            ),
+            dimensions=[
+                dict(
+                    label=label_map.get(col, col),
+                    values=base[col]
+                )
+                for col in cols
+            ],
+            labelfont=dict(size=13),
+            tickfont=dict(size=10),
+        )
+    )
+
+    for party in top_parties:
+        fig.add_trace(
+            go.Scatter(
+                x=[None],
+                y=[None],
+                mode="markers",
+                marker=dict(size=10, color=party_colors[party]),
+                name=party,
+                showlegend=True,
+                hoverinfo="skip",
+            )
+        )
+
+    fig.update_layout(
+        template=PLOTLY_TEMPLATE,
+        title="Parallel coordinates: perfis multivariados por partido",
+        legend=dict(
+            title="Partido",
+            orientation="v",
+            yanchor="top",
+            y=1,
+            xanchor="left",
+            x=1.02,
+        ),
+        margin=dict(l=60, r=220, t=80, b=40),
+    )
+
     save_plotly_figure(fig, "parallel_coordinates_perfis")
 
-
-
-def plot_stacked_area_party_over_time(df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame | None, top_n: int = 6) -> None:
+def plot_stacked_area_party_over_time(
+    df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame | None, top_n: int = 6
+) -> None:
     """
     Área empilhada ao longo do tempo para mostrar a dominância de partidos.
     Usa despesas categorizadas, que preservam granularidade temporal.
@@ -672,19 +848,24 @@ def plot_stacked_area_party_over_time(df_mestre: pd.DataFrame, df_desp_cat: pd.D
     if valor_col is None or time_col is None:
         return
 
-    meta = df_mestre[[c for c in ["idDeputado", "siglaPartido"] if c in df_mestre.columns]].drop_duplicates()
+    meta = df_mestre[
+        [c for c in ["idDeputado", "siglaPartido"] if c in df_mestre.columns]
+    ].drop_duplicates()
     base = base.merge(meta, on="idDeputado", how="left")
     base["siglaPartido"] = base["siglaPartido"].fillna("Desconhecido")
     base = base.dropna(subset=[time_col]).copy()
     base[time_col] = base[time_col].astype(int)
+
+    base = base[base[time_col] < 2026].copy()
+    base = base[base[time_col] > 2022].copy()
+
 
     top_parties = (
         base.groupby("siglaPartido")[valor_col]
         .sum()
         .sort_values(ascending=False)
         .head(top_n)
-        .index
-        .tolist()
+        .index.tolist()
     )
 
     serie = (
@@ -703,11 +884,52 @@ def plot_stacked_area_party_over_time(df_mestre: pd.DataFrame, df_desp_cat: pd.D
         color="siglaPartido",
         template=PLOTLY_TEMPLATE,
         title=f"Área empilhada: dominância de gasto por partido ao longo do tempo",
-        labels={time_col: "Ano", valor_col: "Gasto positivo (R$)", "siglaPartido": "Partido"},
+        labels={
+            time_col: "Ano",
+            valor_col: "Gasto positivo (R$)",
+            "siglaPartido": "Partido",
+        },
+    )
+
+    fig.update_xaxes(
+    tickmode="linear",
+    dtick=1,
+    tick0=int(serie[time_col].min()),
+    tickformat="d",
     )
     save_plotly_figure(fig, "stacked_area_partido_tempo")
 
+def _build_deputado_category_matrix(df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
+    """Monta a matriz partido x categoria usada no heatmap e em outras análises."""
+    base = df_desp_cat.copy()
+    base["idDeputado"] = pd.to_numeric(base["idDeputado"], errors="coerce")
+    base = base.dropna(subset=["idDeputado"]).copy()
+    base["idDeputado"] = base["idDeputado"].astype(int)
 
+    valor_col = _positive_value_column(base)
+    if valor_col is None:
+        return pd.DataFrame()
+
+    meta = df_mestre[[c for c in ["idDeputado", "siglaPartido", "nome"] if c in df_mestre.columns]].drop_duplicates()
+    base = base.merge(meta, on="idDeputado", how="left")
+    base["siglaPartido"] = base["siglaPartido"].fillna("Desconhecido")
+
+    top_parties = (
+        base.groupby("siglaPartido")[valor_col]
+        .sum()
+        .sort_values(ascending=False)
+        .head(top_n)
+        .index
+        .tolist()
+    )
+
+    matriz = (
+        base[base["siglaPartido"].isin(top_parties)]
+        .groupby(["siglaPartido", "nome", "categoria_macro"])[valor_col]
+        .sum()
+        .unstack(fill_value=0.0)
+    )
+    return matriz
 
 def plot_party_category_share_treemap(df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame | None, top_n: int = 10) -> None:
     """
@@ -716,14 +938,14 @@ def plot_party_category_share_treemap(df_mestre: pd.DataFrame, df_desp_cat: pd.D
     """
     if df_desp_cat is None:
         return
-    matriz = _build_party_category_matrix(df_mestre, df_desp_cat, top_n=top_n)
+    matriz = _build_deputado_category_matrix(df_mestre, df_desp_cat, top_n=top_n)
     if matriz.empty:
         return
 
     base = matriz.stack().reset_index(name="gasto_categoria")
     fig = px.treemap(
         base,
-        path=[px.Constant("Despesas"), "siglaPartido", "categoria_macro"],
+        path=[px.Constant("Despesas"), "siglaPartido", "categoria_macro", "nome"],
         values="gasto_categoria",
         color="gasto_categoria",
         color_continuous_scale="YlOrRd",
@@ -731,7 +953,6 @@ def plot_party_category_share_treemap(df_mestre: pd.DataFrame, df_desp_cat: pd.D
         title="Treemap: composição de despesa por partido e categoria",
     )
     save_plotly_figure(fig, "treemap_partido_categoria")
-
 
 
 def plot_clustered_heatmap_and_dendrogram(df: pd.DataFrame, top_n: int = 12) -> None:
@@ -745,7 +966,8 @@ def plot_clustered_heatmap_and_dendrogram(df: pd.DataFrame, top_n: int = 12) -> 
         return
 
     feature_cols = [
-        c for c in [
+        c
+        for c in [
             "gasto_total",
             "gasto_liquido",
             "qtd_despesas",
@@ -765,8 +987,7 @@ def plot_clustered_heatmap_and_dendrogram(df: pd.DataFrame, top_n: int = 12) -> 
         .sum()
         .sort_values(ascending=False)
         .head(top_n)
-        .index
-        .tolist()
+        .index.tolist()
     )
 
     base = (
@@ -817,6 +1038,7 @@ def plot_clustered_heatmap_and_dendrogram(df: pd.DataFrame, top_n: int = 12) -> 
 # ==========================================================
 # Main
 # ==========================================================
+
 
 def main() -> None:
     print("Carregando dataset mestre...")
