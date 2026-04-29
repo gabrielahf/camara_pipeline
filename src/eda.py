@@ -306,31 +306,6 @@ def plot_histograms(df: pd.DataFrame) -> None:
     fig.update_layout(bargap=0.05)
     save_plotly_figure(fig, "hist_gasto_total")
 
-    log_valores = np.log1p(valores)
-    fig = px.histogram(
-        pd.DataFrame({"log_gasto_total": log_valores}),
-        x="log_gasto_total",
-        nbins=30,
-        template=PLOTLY_TEMPLATE,
-        title="Distribuição de log(1 + gasto total)",
-        labels={"log_gasto_total": "log(1 + gasto total)", "count": "Frequência"},
-        color_discrete_sequence=[COLOR_SECONDARY],
-    )
-    fig.add_vline(
-        x=float(log_valores.mean()),
-        line_dash="dash",
-        line_color=COLOR_ACCENT,
-        annotation_text="Média",
-    )
-    fig.add_vline(
-        x=float(log_valores.median()),
-        line_dash="dash",
-        line_color=COLOR_TERTIARY,
-        annotation_text="Mediana",
-    )
-    fig.update_layout(bargap=0.05)
-    save_plotly_figure(fig, "hist_log_gasto_total")
-
 
 def plot_boxplots(df: pd.DataFrame) -> None:
     """Mostra outliers e dispersão em três métricas-chave."""
@@ -512,6 +487,110 @@ def plot_scatter_gasto_atividade(df: pd.DataFrame, n_rotulos: int = 8) -> None:
     save_plotly_figure(fig, "scatter_gasto_atividade_log")
 
 
+def plot_scatter_gasto_atividade_raw(df: pd.DataFrame, n_rotulos: int = 8) -> None:
+    """
+    Scatter principal da EDA com gasto_total BRUTO no eixo X.
+    Sem transformações log — valores diretos em R$ para interpretação imediata.
+    """
+    if "gasto_total" not in df.columns or "atividade_composta" not in df.columns:
+        return
+
+    hover_cols = [
+        c
+        for c in [
+            "nome",
+            "siglaPartido",
+            "siglaUf",
+            "gasto_total",
+            "atividade_composta",
+            "custo_por_atividade",
+        ]
+        if c in df.columns
+    ]
+
+    # Filtrar valores válidos
+    df_plot = df[df["gasto_total"] >= 0].copy()
+    if df_plot.empty:
+        return
+
+    fig = px.scatter(
+        df_plot,
+        x="gasto_total",
+        y="atividade_composta",
+        hover_data=hover_cols,
+        template=PLOTLY_TEMPLATE,
+        title="Relação entre gasto total (R$) e atividade composta",
+        labels={
+            "gasto_total": "Gasto total (R$)",
+            "atividade_composta": "Atividade composta",
+        },
+        opacity=0.7,
+    )
+
+    # Formatar eixo X para moeda brasileira
+    fig.update_xaxes(tickformat=",.0f", title="Gasto total (R$)")
+
+    # Formatar hover para mostrar valores legíveis
+    fig.update_traces(
+        marker=dict(color=COLOR_PRIMARY, size=8, line=dict(color="white", width=0.5)),
+        hovertemplate=(
+            "<b>%{customdata[0]}</b><br>"
+            "Partido: %{customdata[1]} (%{customdata[2]})<br>"
+            "Gasto total: <b>R$ %{x:,.2f}</b><br>"
+            "Atividade composta: %{y:.2f}<br>"
+            "Custo/atividade: R$ %{customdata[5]:,.2f}<br>"
+            "<extra></extra>"
+        ),
+    )
+
+    # Linha de tendência (opcional: calcular em log para estabilidade, plotar em raw)
+    x_raw = df_plot["gasto_total"].replace(0, 1e-3).to_numpy(dtype=float)
+    y = df_plot["atividade_composta"].to_numpy(dtype=float)
+
+    if len(df_plot) >= 2 and np.std(x_raw) > 0:
+        # Fit em escala log para evitar que outliers dominem a regressão
+        x_log = np.log(x_raw)
+        coef = np.polyfit(x_log, y, deg=1)
+
+        # Gerar pontos para plotar em escala raw
+        xp_raw = np.logspace(np.log10(x_raw.min()), np.log10(x_raw.max()), 100)
+        xp_log = np.log(xp_raw)
+        yp = coef[0] * xp_log + coef[1]
+
+        fig.add_trace(
+            go.Scatter(
+                x=xp_raw,
+                y=yp,
+                mode="lines",
+                name="Tendência",
+                line=dict(color=COLOR_ACCENT, dash="dash"),
+                hoverinfo="skip",
+            )
+        )
+
+    # Destacar deputados com maior custo por atividade
+    if "custo_por_atividade" in df.columns and "nome" in df.columns:
+        candidatos = (
+            df_plot[df_plot["atividade_composta"] > 0]
+            .sort_values("custo_por_atividade", ascending=False)
+            .head(n_rotulos)
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=candidatos["gasto_total"],
+                y=candidatos["atividade_composta"],
+                mode="text",
+                text=candidatos["nome"],
+                textposition="top center",
+                showlegend=False,
+                textfont=dict(size=10, color="#333333"),
+                hoverinfo="skip",
+            )
+        )
+
+    save_plotly_figure(fig, "scatter_gasto_atividade_raw")
+
+
 def plot_correlation_heatmap(df: pd.DataFrame) -> None:
     """Heatmap simples de correlação entre variáveis numéricas principais."""
     cols = [
@@ -553,10 +632,6 @@ def plot_correlation_heatmap(df: pd.DataFrame) -> None:
 def plot_party_category_heatmap(
     df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame | None, top_n: int = 10
 ) -> None:
-    """
-    Heatmap partido x categoria de despesa.
-    Útil para mostrar perfis de gasto e diferenças de composição entre grupos.
-    """
     if df_desp_cat is None:
         return
     if (
@@ -571,15 +646,40 @@ def plot_party_category_heatmap(
     if matriz.empty:
         return
 
+    # Apply log1p transformation for color scaling
+    matriz_log = np.log1p(matriz)
+
+    # Create figure with log-transformed values for coloring
     fig = px.imshow(
-        matriz,
+        matriz_log,
         color_continuous_scale="YlGnBu",
         aspect="auto",
         template=PLOTLY_TEMPLATE,
-        title="Heatmap: gasto por partido e macro-categoria",
-        labels=dict(color="Gasto positivo (R$)"),
+        title="Heatmap: log(1 + gasto) por partido e macro-categoria",
+        labels=dict(color="log(1 + gasto) (R$)"),
+        # x/y labels will auto-use matriz columns/index
     )
-    save_plotly_figure(fig, "heatmap_partido_categoria")
+
+    # ✅ Set customdata and hovertemplate via update_traces
+    fig.update_traces(
+        customdata=matriz,  # Original absolute values
+        hovertemplate=(
+            "<b>%{y}</b> → %{x}<br>"
+            "Gasto: <b>R$ %{customdata:,.2f}</b><br>"
+            "<extra></extra>"
+        ),
+    )
+
+    # Optional: Add custom tick labels on colorbar to show original scale
+    fig.update_layout(
+        coloraxis_colorbar=dict(
+            tickvals=np.log1p([0, 1e5, 1e6, 1e7, 3.5e7]),
+            ticktext=["0", "100k", "1M", "10M", "35M"],
+            title="Gasto (R$)",
+        )
+    )
+
+    save_plotly_figure(fig, "heatmap_partido_categoria_log")
 
 
 # ==========================================================
@@ -708,13 +808,16 @@ def plot_beeswarm_activity_by_party(df: pd.DataFrame, top_n: int = 10) -> None:
     save_plotly_figure(fig, "beeswarm_atividade_por_partido")
 
 
-def plot_parallel_coordinates_profiles(df: pd.DataFrame, max_rows: int = 150, top_n_parties: int = 10) -> None:
+def plot_parallel_coordinates_profiles(
+    df: pd.DataFrame, max_rows: int = 150, top_n_parties: int = 10
+) -> None:
     """
     Parallel coordinates com eixos compartilhados corretos.
     A cor representa partido, mas a filtragem deve ser feita fora da legenda.
     """
     cols = [
-        c for c in [
+        c
+        for c in [
             "gasto_total",
             "gasto_liquido",
             "qtd_despesas",
@@ -723,7 +826,11 @@ def plot_parallel_coordinates_profiles(df: pd.DataFrame, max_rows: int = 150, to
         ]
         if c in df.columns
     ]
-    if len(cols) < 4 or "siglaPartido" not in df.columns or "gasto_total" not in df.columns:
+    if (
+        len(cols) < 4
+        or "siglaPartido" not in df.columns
+        or "gasto_total" not in df.columns
+    ):
         return
 
     base = df.copy()
@@ -733,8 +840,7 @@ def plot_parallel_coordinates_profiles(df: pd.DataFrame, max_rows: int = 150, to
         .sum()
         .sort_values(ascending=False)
         .head(top_n_parties)
-        .index
-        .tolist()
+        .index.tolist()
     )
 
     base = base[base["siglaPartido"].isin(top_parties)].copy()
@@ -749,15 +855,12 @@ def plot_parallel_coordinates_profiles(df: pd.DataFrame, max_rows: int = 150, to
         )
 
     base["partido_code"] = pd.Categorical(
-        base["siglaPartido"],
-        categories=top_parties,
-        ordered=True
+        base["siglaPartido"], categories=top_parties, ordered=True
     ).codes
 
     palette = px.colors.qualitative.Bold
     party_colors = {
-        party: palette[i % len(palette)]
-        for i, party in enumerate(top_parties)
+        party: palette[i % len(palette)] for i, party in enumerate(top_parties)
     }
 
     n = max(len(top_parties) - 1, 1)
@@ -786,11 +889,7 @@ def plot_parallel_coordinates_profiles(df: pd.DataFrame, max_rows: int = 150, to
                 showscale=False,
             ),
             dimensions=[
-                dict(
-                    label=label_map.get(col, col),
-                    values=base[col]
-                )
-                for col in cols
+                dict(label=label_map.get(col, col), values=base[col]) for col in cols
             ],
             labelfont=dict(size=13),
             tickfont=dict(size=10),
@@ -826,6 +925,7 @@ def plot_parallel_coordinates_profiles(df: pd.DataFrame, max_rows: int = 150, to
 
     save_plotly_figure(fig, "parallel_coordinates_perfis")
 
+
 def plot_stacked_area_party_over_time(
     df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame | None, top_n: int = 6
 ) -> None:
@@ -859,7 +959,6 @@ def plot_stacked_area_party_over_time(
     base = base[base[time_col] < 2026].copy()
     base = base[base[time_col] > 2022].copy()
 
-
     top_parties = (
         base.groupby("siglaPartido")[valor_col]
         .sum()
@@ -892,14 +991,17 @@ def plot_stacked_area_party_over_time(
     )
 
     fig.update_xaxes(
-    tickmode="linear",
-    dtick=1,
-    tick0=int(serie[time_col].min()),
-    tickformat="d",
+        tickmode="linear",
+        dtick=1,
+        tick0=int(serie[time_col].min()),
+        tickformat="d",
     )
     save_plotly_figure(fig, "stacked_area_partido_tempo")
 
-def _build_deputado_category_matrix(df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
+
+def _build_deputado_category_matrix(
+    df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame, top_n: int = 10
+) -> pd.DataFrame:
     """Monta a matriz partido x categoria usada no heatmap e em outras análises."""
     base = df_desp_cat.copy()
     base["idDeputado"] = pd.to_numeric(base["idDeputado"], errors="coerce")
@@ -910,7 +1012,9 @@ def _build_deputado_category_matrix(df_mestre: pd.DataFrame, df_desp_cat: pd.Dat
     if valor_col is None:
         return pd.DataFrame()
 
-    meta = df_mestre[[c for c in ["idDeputado", "siglaPartido", "nome"] if c in df_mestre.columns]].drop_duplicates()
+    meta = df_mestre[
+        [c for c in ["idDeputado", "siglaPartido", "nome"] if c in df_mestre.columns]
+    ].drop_duplicates()
     base = base.merge(meta, on="idDeputado", how="left")
     base["siglaPartido"] = base["siglaPartido"].fillna("Desconhecido")
 
@@ -919,8 +1023,7 @@ def _build_deputado_category_matrix(df_mestre: pd.DataFrame, df_desp_cat: pd.Dat
         .sum()
         .sort_values(ascending=False)
         .head(top_n)
-        .index
-        .tolist()
+        .index.tolist()
     )
 
     matriz = (
@@ -931,7 +1034,10 @@ def _build_deputado_category_matrix(df_mestre: pd.DataFrame, df_desp_cat: pd.Dat
     )
     return matriz
 
-def plot_party_category_share_treemap(df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame | None, top_n: int = 10) -> None:
+
+def plot_party_category_share_treemap(
+    df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame | None, top_n: int = 10
+) -> None:
     """
     Treemap alternativo focado na composição de despesa por partido e categoria.
     Ajuda a reforçar a leitura de parte-do-todo dentro de cada partido.
@@ -1065,6 +1171,8 @@ def main() -> None:
 
     print("Gerando scatter gasto vs atividade...")
     plot_scatter_gasto_atividade(df)
+
+    plot_scatter_gasto_atividade_raw(df)
 
     print("Gerando heatmap de correlações...")
     plot_correlation_heatmap(df)
