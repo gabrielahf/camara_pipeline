@@ -288,7 +288,7 @@ def plot_histograms(df: pd.DataFrame) -> None:
         nbins=30,
         template=PLOTLY_TEMPLATE,
         title="Distribuição do gasto total",
-        labels={"gasto_total_plot": "Gasto total positivo (R$)", "count": "Frequência"},
+        labels={"gasto_total_plot": "Gasto total (R$)", "count": "Frequência"},
         color_discrete_sequence=[COLOR_PRIMARY],
     )
     fig.add_vline(
@@ -359,7 +359,7 @@ def plot_parties(df: pd.DataFrame, top_n: int = 10) -> None:
         y="gasto_total",
         template=PLOTLY_TEMPLATE,
         title=f"Top {top_n} partidos por gasto total",
-        labels={"siglaPartido": "Partido", "gasto_total": "Gasto total positivo (R$)"},
+        labels={"siglaPartido": "Partido", "gasto_total": "Gasto total (R$)"},
         color_discrete_sequence=[COLOR_PRIMARY],
     )
     save_plotly_figure(fig, "bar_top_partidos_gasto_total")
@@ -374,7 +374,7 @@ def plot_parties(df: pd.DataFrame, top_n: int = 10) -> None:
         category_orders={"siglaPartido": partidos_top},
         template=PLOTLY_TEMPLATE,
         title=f"Distribuição do gasto total nos top {top_n} partidos",
-        labels={"siglaPartido": "Partido", "gasto_total": "Gasto total positivo (R$)"},
+        labels={"siglaPartido": "Partido", "gasto_total": "Gasto total (R$)"},
         color="siglaPartido",
         color_discrete_sequence=px.colors.qualitative.Bold,
     )
@@ -400,7 +400,7 @@ def plot_ufs(df: pd.DataFrame, top_n: int = 15) -> None:
         y="gasto_medio",
         template=PLOTLY_TEMPLATE,
         title=f"Top {top_n} UFs por gasto médio por deputado",
-        labels={"siglaUf": "UF", "gasto_medio": "Gasto médio positivo (R$)"},
+        labels={"siglaUf": "UF", "gasto_medio": "Gasto médio (R$)"},
         color_discrete_sequence=[COLOR_TERTIARY],
     )
     save_plotly_figure(fig, "bar_top_ufs_gasto_medio")
@@ -985,7 +985,7 @@ def plot_stacked_area_party_over_time(
         title=f"Área empilhada: dominância de gasto por partido ao longo do tempo",
         labels={
             time_col: "Ano",
-            valor_col: "Gasto positivo (R$)",
+            valor_col: "Gasto (R$)",
             "siglaPartido": "Partido",
         },
     )
