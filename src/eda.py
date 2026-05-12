@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 from scipy.cluster.hierarchy import linkage, leaves_list
 from scipy.spatial.distance import pdist
+from urllib.request import urlopen
 
 # ==========================================================
 # Configuração
@@ -1141,6 +1142,55 @@ def plot_clustered_heatmap_and_dendrogram(df: pd.DataFrame, top_n: int = 12) -> 
     save_plotly_figure(fig_h, "heatmap_clusterizado_partidos")
 
 
+
+def plot_choropleth_brasil(df_mestre: pd.DataFrame) -> None:
+    """
+    Gera um mapa choropleth mostrando o volume total de gastos por estado (UF).
+    """
+    if "siglaUf" not in df_mestre.columns or "gasto_total" not in df_mestre.columns:
+        return
+
+    # 1. Carregar GeoJSON dos estados brasileiros
+    geojson_url = "https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson"
+    try:
+        with urlopen(geojson_url) as response:
+            brazil_states = json.load(response)
+    except Exception as e:
+        print(f"Erro ao carregar GeoJSON: {e}")
+        return
+
+    # 2. Agrupar dados por UF
+    df_map = (
+        df_mestre.groupby("siglaUf")["gasto_total"]
+        .sum()
+        .reset_index()
+    )
+
+    # 3. Criar o mapa
+    fig = px.choropleth(
+        df_map,
+        geojson=brazil_states,
+        locations="siglaUf",
+        featureidkey="properties.sigla",  # Mapeia 'siglaUf' para 'properties.sigla' no GeoJSON
+        color="gasto_total",
+        color_continuous_scale="Reds",
+        template=PLOTLY_TEMPLATE,
+        title="Distribuição Geográfica de Gastos Totais por UF",
+        labels={"gasto_total": "Gasto Total (R$)", "siglaUf": "Estado"},
+    )
+
+    # Ajustar para focar no Brasil e esconder o resto do globo
+    fig.update_geos(
+        fitbounds="locations", 
+        visible=False,
+        projection_type="mercator"
+    )
+    
+    fig.update_layout(margin={"r":0,"t":50,"l":0,"b":0})
+
+    save_plotly_figure(fig, "mapa_choropleth_gastos_uf")
+
+
 # ==========================================================
 # Main
 # ==========================================================
@@ -1206,6 +1256,9 @@ def main() -> None:
 
     print("✅ EDA concluída com sucesso!")
     print(f"Arquivos salvos em: {EDA_DIR}")
+
+    print("Gerando mapa choropleth...")
+    plot_choropleth_brasil(df)
 
 
 if __name__ == "__main__":

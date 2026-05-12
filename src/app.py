@@ -46,7 +46,11 @@ PLOT_GROUPS = {
     "💰 Composição de Gastos": {
         "title": "Composição por Categoria de Despesa",
         "keywords": ["heatmap_partido_categoria"]
-    }
+    },
+    "🗺️ Visão Geográfica": {
+        "title": "Distribuição Territorial",
+        "keywords": ["mapa_choropleth"]
+    },
 }
 
 def categorize_plot(filename: str) -> str:

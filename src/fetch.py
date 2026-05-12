@@ -218,31 +218,36 @@ def fetch_dataset_by_deputado_ano(
 
 
 def main() -> None:
-    print("Fetching Deputados...")
-    legislaturas = _parse_int_list("LEGISLATURAS", [56, 57])
+    # print("Fetching Deputados...")
+    # legislaturas = _parse_int_list("LEGISLATURAS", [56, 57])
+    # anos = _parse_int_list("ANOS", [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026])
+
+    # deps_all: List[Dict[str, Any]] = []
+    # for leg in tqdm(legislaturas, desc="Deputados"):
+    #     deps_all.extend(get_deputados(leg))
+
+    # df_deps = pd.DataFrame(deps_all).drop_duplicates(subset="id")
+    # if "id" in df_deps.columns:
+    #     df_deps["idDeputado"] = df_deps["id"].astype(int)
+    # df_deps.to_parquet(DATA_RAW / "deputados.parquet", index=False)
+    # deputados = df_deps["idDeputado"].astype(int).tolist()
+    # print(f"Saved deputados.parquet with {len(df_deps)} rows")
+
+    df_deps = pd.read_parquet(DATA_RAW / "deputados.parquet")
+    deputados = df_deps["idDeputado"].astype(int).tolist()
     anos = _parse_int_list("ANOS", [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026])
 
-    deps_all: List[Dict[str, Any]] = []
-    for leg in tqdm(legislaturas, desc="Deputados"):
-        deps_all.extend(get_deputados(leg))
-
-    df_deps = pd.DataFrame(deps_all).drop_duplicates(subset="id")
-    if "id" in df_deps.columns:
-        df_deps["idDeputado"] = df_deps["id"].astype(int)
-    df_deps.to_parquet(DATA_RAW / "deputados.parquet", index=False)
-    deputados = df_deps["idDeputado"].astype(int).tolist()
-    print(f"Saved deputados.parquet with {len(df_deps)} rows")
-
-    print("Fetching Despesas...")
-    fetch_dataset_by_deputado_ano(
-        deputados=deputados,
-        anos=anos,
-        label="Despesas",
-        fetch_func=get_despesas_deputado,
-        out_path=DATA_RAW / "despesas.parquet",
-        data_tmp_path=DATA_RAW / "despesas_tmp.parquet",
-        progress_tmp_path=DATA_RAW / "despesas_progress.parquet",
-    )
+    # print("Fetching Despesas...")
+    # fetch_dataset_by_deputado_ano(
+    #     deputados=deputados,
+    #     anos=anos,
+    #     label="Despesas",
+    #     fetch_func=get_despesas_deputado,
+    #     out_path=DATA_RAW / "despesas.parquet",
+    #     data_tmp_path=DATA_RAW / "despesas_tmp.parquet",
+    #     progress_tmp_path=DATA_RAW / "despesas_progress.parquet",
+    # )
+    
 
     print("Fetching Proposições...")
     fetch_dataset_by_deputado_ano(
