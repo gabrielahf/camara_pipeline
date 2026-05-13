@@ -1,38 +1,55 @@
-# dash_app.py
+# app.py
+
 import dash
 from dash import dcc, html
 from pathlib import Path
 import plotly.io as pio
 import json
+from .styles import *
+from dash.dependencies import Input, Output
 
 ROOT = Path(__file__).resolve().parents[1]
 EDA_DIR = ROOT / "data" / "processed" / "eda"
 
 # ==========================================================
-# CONFIGURAÇÃO DAS ABAS (AGRUPAMENTO TEMÁTICO)
+# CONFIGURAÇÃO DOS GRÁFICOS
 # ==========================================================
-PLOT_GROUPS = {
-    "📊 Visão Geral": {
-        "title": "Distribuições e Métricas Gerais",
-        "keywords": ["hist_", "boxplots_metricas", "heatmap_correlacoes"]
+
+GRAPH_METADATA = {
+    "scatter_gasto_atividade_raw": {
+        "title": "Relação entre Gastos e Atividade Parlamentar",
+        "description": (
+            "Deputados acima da linha de tendência podem indicar "
+            "alto custo proporcional à atividade parlamentar."
+        ),
+        "section": "overview"
     },
-    "🏛️ Por Partido": {
-        "title": "Análise por Partido e UF",
-        "keywords": [
-            "bar_top_partidos",
-            "boxplot_gasto_por_partido",
-            "bar_top_ufs",
-            "beeswarm_atividade"
-        ]
+
+    "heatmap_correlacoes": {
+        "title": "Correlações entre Indicadores Parlamentares",
+        "description": (
+            "Mostra relações entre gastos, atividade, despesas "
+            "e indicadores de desempenho."
+        ),
+        "section": "overview"
     },
-    "👤 Por Deputado": {
-        "title": "Análise Individual",
-        "keywords": ["scatter_gasto_atividade"]
+
+    "bar_top_partidos_gasto_total": {
+        "title": "Partidos com Maior Volume de Gastos",
+        "description": (
+            "Comparação entre os partidos com maior gasto agregado."
+        ),
+        "section": "partidos"
     },
-    "📈 Análise Temporal": {
-        "title": "Evolução ao Longo do Tempo",
-        "keywords": ["stacked_area"]
+
+    "boxplot_gasto_por_partido_top10": {
+        "title": "Distribuição de Gastos por Partido",
+        "description": (
+            "Permite identificar dispersão, consistência e outliers."
+        ),
+        "section": "partidos"
     },
+<<<<<<< HEAD
     "🎯 Análise Multidimensional": { #changing the name was the recommendation of the teacher
         "title": "Análises Multivariadas e Hierárquicas",
         "keywords": [
@@ -42,163 +59,234 @@ PLOT_GROUPS = {
             "treemap_partido_categoria",
             "treemap_partido_uf_deputado"
         ]
+=======
+
+    "bar_top_ufs_gasto_medio": {
+        "title": "UFs com Maior Gasto Médio",
+        "description": (
+            "Comparação do gasto médio entre estados."
+        ),
+        "section": "ufs"
+>>>>>>> 48f1f81 (novo design)
     },
-    "💰 Composição de Gastos": {
-        "title": "Composição por Categoria de Despesa",
-        "keywords": ["heatmap_partido_categoria"]
+
+    "stacked_area_partido_tempo": {
+        "title": "Evolução Temporal dos Gastos",
+        "description": (
+            "Evolução dos gastos parlamentares ao longo do tempo."
+        ),
+        "section": "temporal"
     },
-    "🗺️ Visão Geográfica": {
-        "title": "Distribuição Territorial",
-        "keywords": ["mapa_choropleth"]
+
+    "mapa_choropleth_gastos_uf": {
+        "title": "Distribuição Geográfica dos Gastos",
+        "description": (
+            "Mapa dos gastos parlamentares agregados por estado."
+        ),
+        "section": "temporal"
+    },
+
+    "heatmap_partido_categoria_log": {
+        "title": "Composição de Gastos por Categoria",
+        "description": (
+            "Identifica quais categorias concentram despesas "
+            "em cada partido."
+        ),
+        "section": "advanced"
+    },
+
+    "treemap_partido_categoria": {
+        "title": "Hierarquia de Gastos Parlamentares",
+        "description": (
+            "Visualização hierárquica das despesas "
+            "por partido, categoria e deputado."
+        ),
+        "section": "advanced"
+    },
+
+    "parallel_coordinates_perfis": {
+        "title": "Perfis Multivariados dos Partidos",
+        "description": (
+            "Comparação simultânea entre múltiplas métricas."
+        ),
+        "section": "advanced"
+    },
+
+    "heatmap_clusterizado_partidos": {
+        "title": "Clusterização de Perfis Parlamentares",
+        "description": (
+            "Agrupa partidos com comportamento semelhante."
+        ),
+        "section": "advanced"
     },
 }
 
-def categorize_plot(filename: str) -> str:
-    """Determina a qual grupo um plot pertence com base no nome do arquivo."""
-    name_lower = filename.lower()
-    for group_name, group_info in PLOT_GROUPS.items():
-        if any(keyword in name_lower for keyword in group_info["keywords"]):
-            return group_name
-    return "📊 Visão Geral"
+# ==========================================================
+# LOAD FIGURES
+# ==========================================================
 
-# ==========================================================
-# CARREGAMENTO DOS GRÁFICOS
-# ==========================================================
 json_files = sorted(EDA_DIR.glob("*.json"))
-plots_by_group = {group: [] for group in PLOT_GROUPS.keys()}
-loaded_count = 0
-skipped_count = 0
+figures = {}
 
 for json_file in json_files:
     try:
         fig_dict = json.loads(json_file.read_text())
 
-        # Pular arquivos JSON que não são figuras do Plotly
-        if not isinstance(fig_dict, dict) or "data" not in fig_dict or "layout" not in fig_dict:
-            print(f"Skipping {json_file.name}: not a Plotly figure JSON")
-            skipped_count += 1
+        if "data" not in fig_dict:
             continue
 
-        # Limpar propriedades inválidas
-        for trace in fig_dict.get("data", []):
-            trace.pop("n", None)
-            trace.pop("xaxis", None)
-            trace.pop("yaxis", None)
-
         fig = pio.from_json(json.dumps(fig_dict))
-        group = categorize_plot(json_file.stem)
-        
-        plots_by_group[group].append(
-            (
-                json_file.stem,
-                dcc.Graph(
-                    figure=fig,
-                    style={"height": "650px", "margin": "0"},
-                    config={"displayModeBar": True}
-                )
-            )
-        )
-        loaded_count += 1
 
-    except Exception as e:
-        print(f"Skipping {json_file.name}: {e}")
-        skipped_count += 1
+        figures[json_file.stem] = fig
+
+    except Exception:
         continue
 
-# Remover grupos vazios
-plots_by_group = {k: v for k, v in plots_by_group.items() if v}
+# ==========================================================
+# APP
+# ==========================================================
+
+app = dash.Dash(__name__)
 
 # ==========================================================
-# INTERFACE DO DASHBOARD
+# HELPERS
 # ==========================================================
-app = dash.Dash(__name__, suppress_callback_exceptions=True)
 
-def build_group_tab(group_name: str, plots: list):
-    """Cria o conteúdo de uma aba com múltiplos gráficos."""
-    group_info = PLOT_GROUPS.get(group_name, {"title": group_name})
-    
-    # ✅ CORREÇÃO: List comprehension corretamente encapsulada
-    plot_cards = [
-        html.Div([
-            html.H3(
-                plot_name.replace("_", " ").title(),
-                style={
-                    "color": "#34495e",
-                    "margin": "0 0 15px 0",
-                    "paddingLeft": "15px",
-                    "borderLeft": "5px solid #3498db",
-                    "fontSize": "1.2rem"
-                }
-            ),
-            plot_graph
-        ], style={
-            "marginBottom": "30px",
-            "padding": "20px",
-            "backgroundColor": "white",
-            "borderRadius": "8px",
-            "boxShadow": "0 2px 6px rgba(0,0,0,0.1)"
-        })
-        for plot_name, plot_graph in plots
-    ]
+def create_graph_card(graph_key):
+
+    if graph_key not in figures:
+        return html.Div()
+
+    meta = GRAPH_METADATA.get(graph_key, {})
 
     return html.Div([
-        html.H2(
-            group_info["title"],
-            style={
-                "textAlign": "center",
-                "color": "#2c3e50",
-                "margin": "30px 0 20px 0",
-                "paddingBottom": "10px",
-                "borderBottom": "3px solid #3498db"
-            }
+
+        html.H3(
+            meta.get("title", graph_key),
+            style=GRAPH_TITLE
         ),
-        html.Div(plot_cards, style={"maxWidth": "1400px", "margin": "0 auto", "padding": "20px"})
+
+        html.P(
+            meta.get("description", ""),
+            style=GRAPH_DESCRIPTION
+        ),
+
+        dcc.Graph(
+            figure=figures[graph_key],
+            style={"height": "480px"},
+            config={"displayModeBar": False}
+        )
+
+    ], style=GRAPH_CARD)
+
+
+def build_section(title, description, graph_keys):
+
+    return html.Div([
+
+        html.H2(title, style=SECTION_TITLE),
+
+        html.P(description, style=SECTION_DESCRIPTION),
+
+        html.Div(
+            [create_graph_card(g) for g in graph_keys],
+            style=GRAPH_GRID
+        )
+
     ])
 
-app.layout = html.Div([
-    # Header
+
+# ==========================================================
+# KPIs
+# ==========================================================
+
+kpis = [
+    ("Gasto Total", "R$ 1,2 bi"),
+    ("Média por Deputado", "R$ 2,1 mi"),
+    ("Maior Partido", "PL"),
+    ("UF com Maior Média", "DF"),
+]
+
+kpi_cards = html.Div([
+
     html.Div([
-        html.H1(
-            "📊 Dashboard de Análise Exploratória (EDA)",
-            style={
-                "textAlign": "center",
-                "padding": "30px 20px",
-                "backgroundColor": "#3498db",
-                "color": "white",
-                "marginBottom": "0",
-                "fontSize": "28px"
-            }
-        ),
-        html.P(
-            f"Carregados {loaded_count} gráficos com sucesso | {skipped_count} ignorados",
-            style={
-                "textAlign": "center",
-                "padding": "10px",
-                "backgroundColor": "#2980b9",
-                "color": "#ecf0f1",
-                "margin": "0",
-                "fontWeight": "bold"
-            }
-        )
-    ]),
-    
-    # Abas Temáticas
-    dcc.Tabs(
-        id="main-tabs",
-        value=list(plots_by_group.keys())[0] if plots_by_group else None,
-        children=[
-            dcc.Tab(
-                label=group_name,
-                value=group_name,
-                children=[build_group_tab(group_name, plots)],
-                style={"padding": "15px 25px", "fontSize": "16px"},
-                selected_style={"backgroundColor": "#e8f4f8", "borderTop": "4px solid #3498db"}
-            )
-            for group_name, plots in plots_by_group.items()
-        ],
-        style={"marginTop": "20px"}
-    )
-], style={"fontFamily": "Segoe UI, Arial, sans-serif", "backgroundColor": "#f4f6f9", "height": "100vh"})
+        html.Div(label, style=KPI_LABEL),
+        html.Div(value, style=KPI_VALUE),
+    ], style=KPI_CARD)
+
+    for label, value in kpis
+
+], style=KPI_GRID)
+
+# ==========================================================
+# SIDEBAR
+# ==========================================================
+
+sidebar = html.Div([
+    html.Div("🏛️ Radar Parlamentar", style=SIDEBAR_TITLE),
+    html.Div("Plataforma de análise de gastos", style=SIDEBAR_SUBTITLE),
+
+    html.Div([
+        html.Div("NAVEGAÇÃO", style=NAV_TITLE),
+        
+        html.A("Visão Geral", href="#visao-geral", style=NAV_LINK),
+        html.A("Análise por Partido", href="#analise-partido", style=NAV_LINK),
+        html.A("Análise Regional", href="#analise-regional", style=NAV_LINK),
+        html.A("Evolução Temporal", href="#evolucao-temporal", style=NAV_LINK),
+        html.A("Investigação Avançada", href="#investigacao-avancada", style=NAV_LINK),
+        
+    ], style=NAV_SECTION),
+], style=SIDEBAR_STYLE)
+
+# ==========================================================
+# LAYOUT
+# ==========================================================
+
+app.layout = html.Div([
+    dcc.Location(id='url', refresh=False), 
+    sidebar,
+    html.Div([
+        html.Div(build_section(
+            "Visão Geral",
+            "Principais relações entre gastos parlamentares e atividade legislativa.",
+            ["scatter_gasto_atividade_raw", "heatmap_correlacoes"]
+        ), id="visao-geral"),
+
+        html.Div(build_section(
+            "Análise por Partido",
+            "Comparação entre partidos políticos e padrões de despesa.",
+            ["bar_top_partidos_gasto_total", "boxplot_gasto_por_partido_top10"]
+        ), id="analise-partido"),
+
+        html.Div(build_section(
+            "Análise Regional",
+            "Distribuição geográfica e comparação entre unidades federativas.",
+            ["bar_top_ufs_gasto_medio", "mapa_choropleth_gastos_uf"]
+        ), id="analise-regional"),
+
+        html.Div(build_section(
+            "Evolução Temporal",
+            "Mudanças nos padrões de gastos ao longo do tempo.",
+            ["stacked_area_partido_tempo"]
+        ), id="evolucao-temporal"),
+
+        html.Div(build_section(
+            "Investigação Avançada",
+            "Análises multivariadas, clustering e exploração de padrões complexos.",
+            [
+                "heatmap_partido_categoria_log",
+                "treemap_partido_categoria",
+                "parallel_coordinates_perfis",
+                "heatmap_clusterizado_partidos",
+            ]
+        ), id="investigacao-avancada"),
+
+    ], style=CONTENT_STYLE)
+], style=APP_STYLE)
+
+# ==========================================================
+# MAIN
+# ==========================================================
 
 if __name__ == "__main__":
     app.run(debug=True, port=8050)
