@@ -33,7 +33,7 @@ PLOT_GROUPS = {
         "title": "Evolução ao Longo do Tempo",
         "keywords": ["stacked_area"]
     },
-    "🎯 Análise Avançada": {
+    "🎯 Análise Multidimensional": { #changing the name was the recommendation of the teacher
         "title": "Análises Multivariadas e Hierárquicas",
         "keywords": [
             "parallel_coordinates",
