@@ -810,11 +810,12 @@ def plot_beeswarm_activity_by_party(df: pd.DataFrame, top_n: int = 10) -> None:
 
 
 def plot_parallel_coordinates_profiles(
-    df: pd.DataFrame, max_rows: int = 150, top_n_parties: int = 10
+    df: pd.DataFrame, top_n_parties: int = 10, agg: str = "median"
 ) -> None:
     """
-    Parallel coordinates com eixos compartilhados corretos.
-    A cor representa partido, mas a filtragem deve ser feita fora da legenda.
+    Parallel coordinates com UMA linha por partido (valores agregados).
+    Substitui a versão anterior que plotava deputados individuais,
+    tornando o gráfico ilegível com centenas de linhas sobrepostas.
     """
     cols = [
         c
@@ -834,85 +835,122 @@ def plot_parallel_coordinates_profiles(
     ):
         return
 
-    base = df.copy()
-
     top_parties = (
-        base.groupby("siglaPartido")["gasto_total"]
+        df.groupby("siglaPartido")["gasto_total"]
         .sum()
         .sort_values(ascending=False)
         .head(top_n_parties)
         .index.tolist()
     )
 
-    base = base[base["siglaPartido"].isin(top_parties)].copy()
+    base = df[df["siglaPartido"].isin(top_parties)].copy()
+    base["siglaPartido"] = base["siglaPartido"].replace({"PSL": "UNIÃO"})
     if base.empty:
         return
 
-    if len(base) > max_rows:
-        base = (
-            base.sort_values("gasto_total", ascending=False)
-            .groupby("siglaPartido", group_keys=False)
-            .head(max_rows // max(len(top_parties), 1) + 1)
-        )
+    agg_df = (
+        base.groupby("siglaPartido")[cols]
+        .agg(agg)
+        .reindex(top_parties)
+        .reset_index()
+    )
 
-    base["partido_code"] = pd.Categorical(
-        base["siglaPartido"], categories=top_parties, ordered=True
-    ).codes
+    agg_df = agg_df[agg_df[cols].sum(axis=1) > 0].reset_index(drop=True)
+    top_parties = agg_df["siglaPartido"].tolist()
+
+    plot_df = agg_df.copy()
+    original_df = agg_df.copy()  
+
+    for col in cols:
+        col_min = plot_df[col].min()
+        col_max = plot_df[col].max()
+        rng = col_max - col_min
+        plot_df[col] = (plot_df[col] - col_min) / rng if rng > 0 else 0.0
 
     palette = px.colors.qualitative.Bold
     party_colors = {
         party: palette[i % len(palette)] for i, party in enumerate(top_parties)
     }
 
-    n = max(len(top_parties) - 1, 1)
-    colorscale = [[i / n, party_colors[p]] for i, p in enumerate(top_parties)]
-
     label_map = {
-        "gasto_total": "Gasto total",
-        "gasto_liquido": "Gasto líquido",
-        "qtd_despesas": "Qtd. despesas",
-        "qtd_estornos": "Qtd. estornos",
-        "total_proposicoes": "Total proposições",
-        "total_eventos": "Total eventos",
-        "atividade_composta": "Atividade composta",
-        "custo_por_atividade": "Custo por atividade",
+        "gasto_total": "Gasto Total",
+        "gasto_liquido": "Gasto Líquido",
+        "qtd_despesas": "Qtd. Despesas",
+        "qtd_estornos": "Qtd. Estornos",
+        "total_proposicoes": "Total Proposições",
+        "total_eventos": "Total Eventos",
+        "atividade_composta": "Atividade Composta",
+        "custo_por_atividade": "Custo por Atividade",
     }
+
+    x_positions = list(range(len(cols)))
+    axis_labels = [label_map.get(c, c) for c in cols]
 
     fig = go.Figure()
 
-    fig.add_trace(
-        go.Parcoords(
-            line=dict(
-                color=base["partido_code"],
-                colorscale=colorscale,
-                cmin=0,
-                cmax=n,
-                showscale=False,
-            ),
-            dimensions=[
-                dict(label=label_map.get(col, col), values=base[col]) for col in cols
-            ],
-            labelfont=dict(size=13),
-            tickfont=dict(size=10),
-        )
-    )
-
     for party in top_parties:
+        row = plot_df[plot_df["siglaPartido"] == party].iloc[0]
+        raw_row = original_df[original_df["siglaPartido"] == party].iloc[0]
+
+        y_vals = [row[c] for c in cols]
+
+        hover_parts = [f"<b>{party}</b>"]
+        for col in cols:
+            v = raw_row[col]
+            if v >= 1_000_000:
+                fmt = f"R$ {v / 1e6:.2f}M"
+            elif v >= 1_000:
+                fmt = f"{v:,.0f}"
+            else:
+                fmt = f"{v:.1f}"
+            hover_parts.append(f"  {label_map.get(col, col)}: {fmt}")
+
         fig.add_trace(
             go.Scatter(
-                x=[None],
-                y=[None],
-                mode="markers",
-                marker=dict(size=10, color=party_colors[party]),
+                x=x_positions,
+                y=y_vals,
+                mode="lines+markers",
                 name=party,
-                showlegend=True,
-                hoverinfo="skip",
+                line=dict(color=party_colors[party], width=2.5),
+                marker=dict(
+                    color=party_colors[party],
+                    size=8,
+                    symbol="circle",
+                    line=dict(color="white", width=1.5),
+                ),
+                hovertemplate="<br>".join(hover_parts) + "<extra></extra>",
+                opacity=0.85,
             )
         )
 
+    for xp in x_positions:
+        fig.add_vline(x=xp, line_color="#cccccc", line_width=1, layer="below")
+
     fig.update_layout(
         template=PLOTLY_TEMPLATE,
-        title="Parallel coordinates: perfis multivariados por partido",
+        title=dict(
+            text=(
+                "Perfis Multivariados dos Partidos"
+                f"<br><sup>Agregação por {agg} · eixos normalizados [0–1]</sup>"
+            ),
+            font=dict(size=16),
+        ),
+        xaxis=dict(
+            tickmode="array",
+            tickvals=x_positions,
+            ticktext=axis_labels,
+            tickfont=dict(size=12),
+            showgrid=True,
+            gridcolor="#e8e8e8",
+            zeroline=False,
+        ),
+        yaxis=dict(
+            showticklabels=True,
+            showgrid=True,
+            gridcolor="#e8e8e8",
+            title="Valor normalizado [0–1]",
+            range=[-0.05, 1.05],
+        ),
         legend=dict(
             title="Partido",
             orientation="v",
@@ -921,11 +959,12 @@ def plot_parallel_coordinates_profiles(
             xanchor="left",
             x=1.02,
         ),
-        margin=dict(l=60, r=220, t=80, b=40),
+        margin=dict(l=60, r=220, t=100, b=60),
+        hovermode="x unified",
+        plot_bgcolor="white",
     )
 
     save_plotly_figure(fig, "parallel_coordinates_perfis")
-
 
 def plot_stacked_area_party_over_time(
     df_mestre: pd.DataFrame, df_desp_cat: pd.DataFrame | None, top_n: int = 6
