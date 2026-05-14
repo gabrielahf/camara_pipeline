@@ -12,8 +12,9 @@ DATA_PROCESSED = ROOT / "data" / "processed"
 
 
 def load_dataset():
-    parquet = DATA_PROCESSED / "dataset_mestre_clean.parquet"
-    csv = DATA_PROCESSED / "dataset_mestre_clean.csv"
+    # O seu novo arquivo gerado pelo clean.py
+    parquet = DATA_PROCESSED / "dataset_modelagem.parquet"
+    csv = DATA_PROCESSED / "dataset_modelagem.csv"
 
     if parquet.exists():
         df = pd.read_parquet(parquet)
@@ -28,34 +29,33 @@ def load_dataset():
 def main():
     df = load_dataset()
 
-    # garante colunas numéricas
-    for col in ["gasto_total", "total_proposicoes", "total_eventos"]:
+    # Garante colunas numéricas necessárias
+    numeric_cols = ["gasto_total", "gasto_normalizado_dist", "atividade_composta", "distancia_km"]
+    for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # cria atividade_composta se necessário
-    if "atividade_composta" not in df.columns:
-        df["atividade_composta"] = (
-            df.get("total_proposicoes", 0) + df.get("total_eventos", 0) * 0.3
-        )
-
-    x = df["gasto_total"].astype(float)
+    # 1. Correlação: Gasto Normalizado vs Atividade
+    # Isso mostra se a eficiência de gasto está ligada à produção
+    x = df["gasto_normalizado_dist"].astype(float)
     y = df["atividade_composta"].astype(float)
-
     r = float(np.corrcoef(x, y)[0, 1]) if len(df) >= 2 else float("nan")
 
-    # Scatter gasto vs atividade
+    # Scatter: Gasto Normalizado vs Atividade
     plt.figure()
-    plt.scatter(x, y, alpha=0.6)
-    plt.xlabel("Gasto total (R$)")
+    plt.scatter(x, y, alpha=0.6, c=df["distancia_km"], cmap='viridis')
+    plt.colorbar(label='Distância até Brasília (km)')
+    plt.xlabel("Gasto normalizado (R$ / km de distância)")
     plt.ylabel("Atividade composta")
-    plt.title("Relação entre gasto e atividade")
+    plt.title("Relação: Gasto Normalizado por Distância vs Atividade")
     plt.tight_layout()
-    plt.savefig(DATA_PROCESSED / "scatter_gasto_atividade.png", dpi=130)
+    plt.savefig(DATA_PROCESSED / "scatter_normalizado_atividade.png", dpi=130)
     plt.close()
 
-    # K-Means clustering
-    features = df[["gasto_total", "atividade_composta"]].copy()
+    # 2. K-Means clustering usando as métricas normalizadas
+    # Agora o algoritmo agrupa por eficiência, ignorando o "custo geográfico" inevitável
+    features_list = ["gasto_normalizado_dist", "atividade_composta"]
+    features = df[features_list].copy()
     features = features.replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
     scaler = StandardScaler()
@@ -64,56 +64,62 @@ def main():
     inertias = []
     models = []
 
+    # Testando k de 2 a 5
     for k in range(2, 6):
         km = KMeans(n_clusters=k, n_init=10, random_state=42)
         km.fit(X)
         inertias.append(km.inertia_)
         models.append(km)
 
+    # Seleção do melhor K (pelo método da inércia mínima neste caso)
     best_k = int(np.argmin(inertias)) + 2
     best_model = models[best_k - 2]
     df["cluster"] = best_model.labels_
 
+    # 3. Resumo dos Clusters
     resumo = (
         df.groupby("cluster")
         .agg(
             n=("idDeputado", "count"),
-            gasto_medio=("gasto_total", "mean"),
+            gasto_norm_medio=("gasto_normalizado_dist", "mean"),
             atividade_media=("atividade_composta", "mean"),
+            distancia_media=("distancia_km", "mean")
         )
         .reset_index()
         .to_dict(orient="records")
     )
 
-    # Scatter clusters
+    # Scatter de Clusters Normalizados
     plt.figure()
     for c in sorted(df["cluster"].unique()):
         m = df["cluster"] == c
         plt.scatter(
-            df.loc[m, "gasto_total"],
+            df.loc[m, "gasto_normalizado_dist"],
             df.loc[m, "atividade_composta"],
             alpha=0.6,
             label=f"Cluster {c}",
         )
     plt.legend()
-    plt.xlabel("Gasto total (R$)")
+    plt.xlabel("Gasto normalizado (R$ / km)")
     plt.ylabel("Atividade composta")
-    plt.title("Perfis de parlamentares (clusters KMeans)")
+    plt.title("Perfis de Parlamentares (Normalizado por Distância)")
     plt.tight_layout()
-    plt.savefig(DATA_PROCESSED / "clusters_scatter.png", dpi=130)
+    plt.savefig(DATA_PROCESSED / "clusters_normalizados_scatter.png", dpi=130)
     plt.close()
 
-    (DATA_PROCESSED / "correlacao_pearson.json").write_text(
-        json.dumps({"pearson_r": r}, ensure_ascii=False, indent=2), encoding="utf-8"
+    # Salvando resultados
+    (DATA_PROCESSED / "correlacao_pearson_normalizada.json").write_text(
+        json.dumps({"pearson_r_normalizado": r}, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    (DATA_PROCESSED / "kmeans_resumo.json").write_text(
+    (DATA_PROCESSED / "kmeans_resumo_normalizado.json").write_text(
         json.dumps({"best_k": best_k, "resumo": resumo}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
-    print("Correlação (r) =", r)
-    print("Melhor k =", best_k)
-    print("Arquivos salvos em", DATA_PROCESSED)
+    print(f"Análise finalizada com sucesso!")
+    print(f"Correlação normalizada (r): {r:.4f}")
+    print(f"Melhor k encontrado: {best_k}")
+    print(f"Arquivos salvos em: {DATA_PROCESSED}")
 
 
 if __name__ == "__main__":

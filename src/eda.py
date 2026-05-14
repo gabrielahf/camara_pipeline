@@ -1181,6 +1181,52 @@ def plot_clustered_heatmap_and_dendrogram(df: pd.DataFrame, top_n: int = 12) -> 
     save_plotly_figure(fig_h, "heatmap_clusterizado_partidos")
 
 
+# def plot_analise_por_deputado(df: pd.DataFrame, output_dir: Path, top_n: int = 10):
+#     """
+#     Gera a sessão de análise individual com dois gráficos:
+#     1) Ranking de Eficiência (Gasto Normalizado / Proposição)
+#     2) Scatter Plot de Clusters (Gasto Normalizado vs Atividade Composta)
+#     """
+#     # Preparação de dados
+#     df = df.copy()
+#     df['identificador'] = df['nome'] + " (" + df['siglaPartido'] + ")"
+    
+#     # 1. GRÁFICO DE BARRAS: Ranking de Eficiência
+#     # Índice = Gasto Normalizado / (Propostas + 1) -> Menor é melhor.
+#     # Vamos mostrar os 10 que MAIS gastam proporcionalmente à sua produção.
+#     df['custo_proposta_norm'] = df['gasto_normalizado_dist'] / (df['total_proposicoes'] + 1)
+#     top_ineficientes = df.sort_values('custo_proposta_norm', ascending=False).head(top_n)
+
+#     fig_bar = px.bar(
+#         top_ineficientes,
+#         x='custo_proposta_norm',
+#         y='identificador',
+#         orientation='h',
+#         color='custo_proposta_norm',
+#         color_continuous_scale='Reds',
+#         title=f"Top {top_n} Deputados: Maior Custo Normalizado por Proposição",
+#         labels={'custo_proposta_norm': 'R$ (Norm) / Proposta', 'identificador': 'Deputado'}
+#     )
+#     fig_bar.update_layout(yaxis={'categoryorder':'total ascending'}, template=PLOTLY_TEMPLATE)
+#     save_plotly_figure(fig_bar, "ranking_ineficiencia_deputado", output_dir)
+
+#     # 2. SCATTER PLOT: Clusters de Performance
+#     # Visualização da relação entre o que se gasta e o que se produz
+#     fig_scatter = px.scatter(
+#         df,
+#         x="gasto_normalizado_dist",
+#         y="atividade_composta",
+#         color="cluster" if "cluster" in df.columns else "siglaUf",
+#         hover_data=['nome', 'siglaPartido', 'distancia_km'],
+#         title="Perfil de Performance: Gasto Normalizado vs. Atividade Composta",
+#         labels={
+#             "gasto_normalizado_dist": "Gasto Normalizado (R$ / km)",
+#             "atividade_composta": "Índice de Atividade Composta"
+#         }
+#     )
+#     fig_scatter.update_layout(template=PLOTLY_TEMPLATE)
+#     save_plotly_figure(fig_scatter, "scatter_performance_deputado", output_dir)
+
 
 def plot_choropleth_brasil(df_mestre: pd.DataFrame) -> None:
     """
@@ -1271,6 +1317,9 @@ def main() -> None:
 
     print("Exportando tabelas de anomalias...")
     export_anomaly_tables(df)
+
+    # print("Analise por Deputado...")
+    # plot_analise_por_deputado(df, DATA_PROCESSED)
 
     # ------------------------------------------------------
     # Gráficos adicionais mais expressivos / inspirados nas referências

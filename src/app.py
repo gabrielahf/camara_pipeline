@@ -320,7 +320,7 @@ app.layout = html.Div([
                 "Análise da eficiência e correlação entre gastos e atividade legislativa.",
                 [
                     "scatter_gasto_atividade_raw",
-                    "heatmap_correlacoes"
+                    "heatmap_correlacoes",
                 ]
             ),
 
@@ -362,6 +362,23 @@ app.layout = html.Div([
 
             id="analise-regional"
         ),
+
+        # ==================================================
+        # DEPUTADOS
+        # ==================================================
+
+        # html.Div(
+
+        #     build_section(
+        #         "Análise por Deputados",
+        #         "TESTE.",
+        #         [
+        #             "scatter_performance_deputado"
+        #         ]
+        #     ),
+
+        #     id="analise-regional"
+        # ),
 
         # ==================================================
         # TEMPORAL

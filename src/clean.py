@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import geopandas as gpd
+from geopy.distance import geodesic
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -139,6 +141,22 @@ def build_dataset_modelagem(
     """
     df = df_deps.copy()
 
+    try:
+        url_geojson = "https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson"
+        gdf = gpd.read_file(url_geojson)
+        brasilia_coords = (-15.7975, -47.8919)
+
+        gdf['distancia_brasilia'] = gdf.apply(
+            lambda row: geodesic((row.geometry.centroid.y, row.geometry.centroid.x), brasilia_coords).km, 
+            axis=1
+        )
+        
+        dist_map = gdf.set_index('sigla')['distancia_brasilia'].to_dict()
+        df['distancia_km'] = df['siglaUf'].map(dist_map).fillna(0) 
+    except Exception as e:
+        print(f"Erro ao carregar dados geográficos: {e}")
+        df['distancia_km'] = 0
+
     if not df_desp.empty and "idDeputado" in df_desp.columns:
         agg_desp = (
             df_desp.groupby("idDeputado")
@@ -175,6 +193,7 @@ def build_dataset_modelagem(
         df[col] = df[col].fillna(0)
 
     df["atividade_composta"] = df["total_proposicoes"] + df["total_eventos"] * 0.3
+    df['gasto_normalizado_dist'] = df['gasto_total'] / (df['distancia_km'] + 1)
 
     df.to_csv(DATA_PROC / "dataset_modelagem.csv", index=False)
     df.to_parquet(DATA_PROC / "dataset_modelagem.parquet", index=False)
